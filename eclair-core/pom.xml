@@ -67,6 +67,7 @@
                 </bitcoind.url>
                 <bitcoind.md5>c811c157d4d618f7d7f4b9f24834551c</bitcoind.md5>
                 <bitcoind.sha1>3ab7e537bd00bf35e6a78fca108d0d886f8289c1</bitcoind.sha1>
+                <metrics.scala.version>4.0.1</metrics.scala.version>
             </properties>
         </profile>
         <profile>
@@ -81,6 +82,7 @@
                 </bitcoind.url>
                 <bitcoind.md5>1521e1d0901169004b9c1c9b552868b7</bitcoind.md5>
                 <bitcoind.sha1>7216298f77162618f322fdf499f1f1b67a0048b7</bitcoind.sha1>
+                <metrics.scala.version>4.0.1</metrics.scala.version>
             </properties>
         </profile>
         <profile>
@@ -94,6 +96,7 @@
                 <bitcoind.url>https://bitcoin.org/bin/bitcoin-core-0.14.0/bitcoin-0.14.0-win64.zip</bitcoind.url>
                 <bitcoind.md5>e84bc3a81ad3d1776299419eb7a04935</bitcoind.md5>
                 <bitcoind.sha1>d2e64fcabf6f85d56d64a52c76e007b6defc32ef</bitcoind.sha1>
+                <metrics.scala.version>4.0.1</metrics.scala.version>
             </properties>
         </profile>
     </profiles>
@@ -187,6 +190,11 @@
             <groupId>com.google.code.findbugs</groupId>
             <artifactId>jsr305</artifactId>
             <version>3.0.2</version>
+        </dependency>
+        <dependency>
+            <groupId>nl.grons</groupId>
+            <artifactId>metrics4-scala_${scala.version.short}</artifactId>
+            <version>${metrics.scala.version}</version>
         </dependency>
         <!-- TESTS -->
         <dependency>
