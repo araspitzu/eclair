@@ -196,12 +196,17 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
             if (p.isEmpty) throw EmptyAPIPasswordException else p
           }
 
-          override def getInfoResponse: Future[GetInfoResponse] = Future.successful(
-            GetInfoResponse(nodeId = nodeParams.privateKey.publicKey,
-              alias = nodeParams.alias,
-              port = config.getInt("server.port"),
-              chainHash = nodeParams.chainHash,
-              blockHeight = Globals.blockCount.intValue()))
+          private[this] val metricsGetInfoResponse = metrics.timer("metrics.GetInfoResponseTimer")
+          
+          override def getInfoResponse: Future[GetInfoResponse] = metricsGetInfoResponse.timeFuture {
+            Future{
+              GetInfoResponse(nodeId = nodeParams.privateKey.publicKey,
+                alias = nodeParams.alias,
+                port = config.getInt("server.port"),
+                chainHash = nodeParams.chainHash,
+                blockHeight = Globals.blockCount.intValue())
+            }
+          }
 
           override def appKit: Kit = kit
         }
@@ -213,8 +218,10 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
       } else {
         Future.successful(logger.info("json-rpc api is disabled"))
       }
-    } yield kit
-
+    } yield {
+      Reporting.start()
+      kit
+    }
   }
 
 }

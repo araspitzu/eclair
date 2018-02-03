@@ -22,6 +22,7 @@ import fr.acinq.eclair.payment.{PaymentRequest, PaymentResult, ReceivePayment, S
 import fr.acinq.eclair.router.ChannelDesc
 import fr.acinq.eclair.wire.{ChannelAnnouncement, ChannelUpdate, NodeAnnouncement}
 import grizzled.slf4j.Logging
+import nl.grons.metrics4.scala.DefaultInstrumented
 import org.json4s.JsonAST.{JBool, JInt, JString}
 import org.json4s.{JValue, jackson}
 
@@ -46,7 +47,7 @@ final case class RpcValidationRejection(requestId: String, message: String) exte
 final case class ExceptionRejection(requestId: String, message: String) extends RPCRejection
 // @formatter:on
 
-trait Service extends Logging {
+trait Service extends Logging with DefaultInstrumented {
 
   implicit def ec: ExecutionContext = ExecutionContext.Implicits.global
 
