@@ -1,0 +1,1 @@
+JAVA_OPTS=-Declair.watcher-type=bitcoinj -Declair.api.binding-ip=0.0.0.0 -Declair.node-alias=eclair -Declair.printToConsole -Declair.monitoring.enabled=true -Declair.monitoring.influxDb.database=metrics -Declair.monitoring.influxDb.host=10.5.0.2 -Declair.api.enabled=true -Declair.api.password=secret

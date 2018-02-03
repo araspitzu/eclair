@@ -1,0 +1,56 @@
+version: '2'
+
+services:
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    env_file:
+      - 'monitoring_env.influxdb'
+    volumes:
+      # Data persistency
+      # sudo mkdir -p /srv/docker/influxdb/data
+      - /home/andrea/docker-influxdb:/var/lib/influxdb
+    networks:
+      virt:
+        ipv4_address: 10.5.0.2
+
+
+  eclair:
+    build: .
+    container_name: eclair-node
+    ports:
+      - "9735:9735"
+      - "8080:8080"
+    env_file:
+      - "monitoring_env.eclair"
+    volumes:
+      # Mount eclair's container data dir into /var/lib/eclair-node
+      - /home/andrea/docker-eclair-node:/data
+    links:
+      - influxdb
+    networks:
+      virt:
+        ipv4_address: 10.5.0.3
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    env_file:
+      - 'monitoring_env.grafana'
+    links:
+      - influxdb
+    networks:
+      virt:
+        ipv4_address: 10.5.0.4
+
+networks:
+  virt:
+    driver: bridge
+    ipam:
+     config:
+       - subnet: 10.5.0.0/16
+         gateway: 10.5.0.1

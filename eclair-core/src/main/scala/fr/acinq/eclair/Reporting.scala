@@ -14,6 +14,10 @@ object Reporting extends DefaultInstrumented with Logging {
 
   def start(conf: Config) = {
     
+    val isMonitoringEnabled = conf.getBoolean("monitoring.enabled")
+    logger.info(s"Monitoring enabled:${isMonitoringEnabled}")
+    logger.info(s"${metricRegistry.getNames}")
+    
     lazy val influxDbSender = new InfluxDbHttpSender(
       conf.getString("monitoring.influxDb.protocol"),
       conf.getString("monitoring.influxDb.host"),
