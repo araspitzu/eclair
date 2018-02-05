@@ -11,7 +11,7 @@ services:
     volumes:
       # Data persistency
       # sudo mkdir -p /srv/docker/influxdb/data
-      - /home/andrea/docker-influxdb:/var/lib/influxdb
+      - ${INFLUXDB_DATADIR}:/var/lib/influxdb
     networks:
       virt:
         ipv4_address: 10.5.0.2
@@ -27,7 +27,7 @@ services:
       - "monitoring_env.eclair"
     volumes:
       # Mount eclair's container data dir into /var/lib/eclair-node
-      - /home/andrea/docker-eclair-node:/data
+      - ${ECLAIR_DATADIR}:/data
     links:
       - influxdb
     networks:
