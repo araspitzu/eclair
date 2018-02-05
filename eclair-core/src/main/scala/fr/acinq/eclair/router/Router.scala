@@ -448,6 +448,8 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
 
   onTransition {
     case _ -> NORMAL =>
+      //TODO add here metric gathering
+      
       log.info(s"current status channels=${nextStateData.channels.size} nodes=${nextStateData.nodes.size} updates=${nextStateData.updates.size} privateChannels=${nextStateData.privateChannels.size} privateUpdates=${nextStateData.privateUpdates.size}")
       log.info(s"children=${context.children.size} rebroadcast=${nextStateData.rebroadcast.size} stash.channels=${nextStateData.stash.channels.size} stash.nodes=${nextStateData.stash.nodes.size} stash.updates=${nextStateData.stash.updates.size} awaiting=${nextStateData.awaiting.size} excludedChannels=${nextStateData.excludedChannels.size}")
   }

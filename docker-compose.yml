@@ -5,7 +5,7 @@ services:
     image: influxdb:latest
     container_name: influxdb
     ports:
-      - "8086:8086"
+      - "127.0.0.1:8086:8086"
     env_file:
       - 'monitoring_env.influxdb'
     volumes:
@@ -22,7 +22,7 @@ services:
     container_name: eclair-node
     ports:
       - "9735:9735"
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     env_file:
       - "monitoring_env.eclair"
     volumes:
@@ -38,7 +38,7 @@ services:
     image: grafana/grafana:latest
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "127:0.0.1:3000:3000"
     env_file:
       - 'monitoring_env.grafana'
     links:
