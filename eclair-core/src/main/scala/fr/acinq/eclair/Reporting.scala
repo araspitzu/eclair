@@ -34,11 +34,8 @@ object Reporting extends DefaultInstrumented with Logging {
     //TODO remove console reporter
     if(isMonitoringEnabled){
       logger.info("Starting metrics reporter")
-      val consoleReporter = ConsoleReporter.forRegistry(metricsRegistry).build()
       val influxDbReporter = InfluxDbReporter.forRegistry(metricRegistry).build(influxDbSender)
-      
       influxDbReporter.start(3, TimeUnit.SECONDS)
-      consoleReporter.start(3, TimeUnit.SECONDS)
 
     }
     
