@@ -69,11 +69,14 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
 
   import ExecutionContext.Implicits.global
   
-  private[this] lazy val metricsRoutingMessages = metrics.meter("router.RoutingMessagesMeter")
-  private[this] lazy val metricsNodeAnnouncement = metrics.meter("router.NodeAnnouncement")
-  private[this] lazy val metricsChannelUpdate = metrics.meter("router.ChannelUpdate")
-  private[this] lazy val metricsChannelAnnouncement = metrics.meter("router.ChannelAnnouncement")
-  private[this] lazy val metricsFindRouteTimer = metrics.timer("router.FindRoute")
+  private[this] lazy val metricsChannelUpdate = metrics.meter("ChannelUpdate")
+  private[this] lazy val metricsFindRouteTimer = metrics.timer("FindRoute")
+  private[this] lazy val metricsKnownChannels = metrics.meter("KnownChannels")
+  private[this] lazy val metricsStashChannels = metrics.meter("StashChannels")
+  private[this] lazy val metricsKnownNodes = metrics.meter("KnownNodes")
+  private[this] lazy val metricsStashNodes = metrics.meter("StashNodes")
+  private[this] lazy val metricsNetworkUpdates = metrics.meter("NetworkUpdates")
+  private[this] lazy val metricsRebroadcastSize = metrics.meter("RebroadcastSize")
 
   context.system.eventStream.subscribe(self, classOf[LocalChannelUpdate])
   context.system.eventStream.subscribe(self, classOf[LocalChannelDown])
@@ -244,7 +247,6 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       stay using d.copy(sendingState = d.sendingState - actor)
 
     case Event(c: ChannelAnnouncement, d) =>
-      metricsChannelAnnouncement.mark
       log.debug(s"received channel announcement for shortChannelId=${c.shortChannelId.toHexString} nodeId1=${c.nodeId1} nodeId2=${c.nodeId2} from $sender")
       if (d.channels.containsKey(c.shortChannelId) || d.awaiting.keys.exists(_.shortChannelId == c.shortChannelId) || d.stash.channels.contains(c)) {
         log.debug("ignoring {} (duplicate)", c)
@@ -259,7 +261,6 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       }
 
     case Event(n: NodeAnnouncement, d: Data) =>
-      metricsNodeAnnouncement.mark
       log.debug(s"received node announcement for nodeId=${n.nodeId} from $sender")
       if (d.nodes.containsKey(n.nodeId) && d.nodes(n.nodeId).timestamp >= n.timestamp) {
         log.debug("ignoring {} (old timestamp or duplicate)", n)
@@ -366,9 +367,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       if (d.rebroadcast.isEmpty) {
         stay
       } else {
-        val rebroadcastSize = d.rebroadcast.size
-        metricsRoutingMessages.mark(rebroadcastSize)
-        log.info(s"broadcasting $rebroadcastSize routing messages")
+        log.info(s"broadcasting ${d.rebroadcast.size} routing messages")
         context.actorSelection(context.system / "*" / "switchboard") ! Rebroadcast(d.rebroadcast)
         stay using d.copy(rebroadcast = Queue.empty)
       }
@@ -448,7 +447,13 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
 
   onTransition {
     case _ -> NORMAL =>
-      //TODO add here metric gathering
+      
+      metricsKnownChannels.mark(nextStateData.channels.size)
+      metricsStashChannels.mark(nextStateData.stash.channels.size)
+      metricsKnownNodes.mark(nextStateData.nodes.size)
+      metricsStashNodes.mark(nextStateData.nodes.size)
+      metricsNetworkUpdates.mark(nextStateData.updates.size)
+      metricsRebroadcastSize.mark(nextStateData.rebroadcast.size)
       
       log.info(s"current status channels=${nextStateData.channels.size} nodes=${nextStateData.nodes.size} updates=${nextStateData.updates.size} privateChannels=${nextStateData.privateChannels.size} privateUpdates=${nextStateData.privateUpdates.size}")
       log.info(s"children=${context.children.size} rebroadcast=${nextStateData.rebroadcast.size} stash.channels=${nextStateData.stash.channels.size} stash.nodes=${nextStateData.stash.nodes.size} stash.updates=${nextStateData.stash.updates.size} awaiting=${nextStateData.awaiting.size} excludedChannels=${nextStateData.excludedChannels.size}")
