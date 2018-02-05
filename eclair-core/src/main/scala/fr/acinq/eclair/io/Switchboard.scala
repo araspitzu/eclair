@@ -8,15 +8,17 @@ import fr.acinq.eclair.NodeParams
 import fr.acinq.eclair.blockchain.EclairWallet
 import fr.acinq.eclair.channel.HasCommitments
 import fr.acinq.eclair.router.Rebroadcast
+import nl.grons.metrics4.scala.DefaultInstrumented
 
 /**
   * Ties network connections to peers.
   * Created by PM on 14/02/2017.
   */
-class Switchboard(nodeParams: NodeParams, authenticator: ActorRef, watcher: ActorRef, router: ActorRef, relayer: ActorRef, wallet: EclairWallet) extends Actor with ActorLogging {
-
+class Switchboard(nodeParams: NodeParams, authenticator: ActorRef, watcher: ActorRef, router: ActorRef, relayer: ActorRef, wallet: EclairWallet) extends Actor with ActorLogging with DefaultInstrumented {
   authenticator ! self
 
+  private[this] lazy val metricsPeerConnected = metrics.meter("switchboard.PeersConnected")
+  
   // we load peers and channels from database
   private val initialPeers = {
     val channels = nodeParams.channelsDb.listChannels().groupBy(_.commitments.remoteParams.nodeId)
@@ -33,8 +35,13 @@ class Switchboard(nodeParams: NodeParams, authenticator: ActorRef, watcher: Acto
       }.toMap
   }
 
-  def receive: Receive = main(initialPeers)
+  def receive: Receive = mainReceiveWithMetrics(initialPeers)
 
+  private def mainReceiveWithMetrics(peers: Map[PublicKey, ActorRef]) = {
+    metricsPeerConnected.mark(peers.size)
+    main(peers)
+  }
+  
   def main(peers: Map[PublicKey, ActorRef]): Receive = {
 
     case Peer.Connect(NodeURI(publicKey, _)) if publicKey == nodeParams.privateKey.publicKey =>
@@ -44,7 +51,7 @@ class Switchboard(nodeParams: NodeParams, authenticator: ActorRef, watcher: Acto
       // we create a peer if it doesn't exist
       val peer = createOrGetPeer(peers, remoteNodeId, previousKnownAddress = None, offlineChannels = Set.empty)
       peer forward c
-      context become main(peers + (remoteNodeId -> peer))
+      context become mainReceiveWithMetrics(peers + (remoteNodeId -> peer))
 
     case o@Peer.OpenChannel(remoteNodeId, _, _, _) =>
       peers.get(remoteNodeId) match {
@@ -56,15 +63,16 @@ class Switchboard(nodeParams: NodeParams, authenticator: ActorRef, watcher: Acto
       peers.collectFirst {
         case (remoteNodeId, peer) if peer == actor =>
           log.debug(s"$actor is dead, removing from peers")
+          metricsPeerConnected.mark(peers.size - 1)
           nodeParams.peersDb.removePeer(remoteNodeId)
-          context become main(peers - remoteNodeId)
+          context become mainReceiveWithMetrics(peers - remoteNodeId)
       }
 
     case auth@Authenticator.Authenticated(_, _, remoteNodeId, _, _, _) =>
       // if this is an incoming connection, we might not yet have created the peer
       val peer = createOrGetPeer(peers, remoteNodeId, previousKnownAddress = None, offlineChannels = Set.empty)
       peer forward auth
-      context become main(peers + (remoteNodeId -> peer))
+      context become mainReceiveWithMetrics(peers + (remoteNodeId -> peer))
 
     case r: Rebroadcast => peers.values.foreach(_ forward r)
 

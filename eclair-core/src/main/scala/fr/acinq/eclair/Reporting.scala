@@ -16,7 +16,8 @@ object Reporting extends DefaultInstrumented with Logging {
     
     val isMonitoringEnabled = conf.getBoolean("monitoring.enabled")
     logger.info(s"Monitoring enabled:${isMonitoringEnabled}")
-    logger.info(s"${metricRegistry.getNames}")
+    if(isMonitoringEnabled)
+      logger.info(s"${metricRegistry.getNames}")
     
     lazy val influxDbSender = new InfluxDbHttpSender(
       conf.getString("monitoring.influxDb.protocol"),
@@ -29,15 +30,16 @@ object Reporting extends DefaultInstrumented with Logging {
       1000,
       ""
     )
-    
-    val consoleReporter = ConsoleReporter.forRegistry(metricsRegistry).build()
-    val influxDbReporter = InfluxDbReporter.forRegistry(metricRegistry).build(influxDbSender)
-    
-    if(conf.getBoolean("monitoring.enabled")){
+
+    //TODO remove console reporter
+    if(isMonitoringEnabled){
       logger.info("Starting metrics reporter")
+      val consoleReporter = ConsoleReporter.forRegistry(metricsRegistry).build()
+      val influxDbReporter = InfluxDbReporter.forRegistry(metricRegistry).build(influxDbSender)
+      
       influxDbReporter.start(3, TimeUnit.SECONDS)
       consoleReporter.start(3, TimeUnit.SECONDS)
-      logger.info("...started")
+
     }
     
   }

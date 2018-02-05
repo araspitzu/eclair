@@ -195,24 +195,14 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
             val p = config.getString("api.password")
             if (p.isEmpty) throw EmptyAPIPasswordException else p
           }
-  
-          private[this] val metricsDummy = metrics.counter("GetDummy")
-  
-          system.scheduler.schedule(2 seconds, 2 seconds) {
-            metricsDummy += 1
-          }
-
-          private[this] val metricsGetInfoResponse = metrics.timer("GetInfoResponseTimer")
           
-          override def getInfoResponse: Future[GetInfoResponse] = metricsGetInfoResponse.timeFuture {
-            Future{
+          override def getInfoResponse: Future[GetInfoResponse] = Future.successful(
               GetInfoResponse(nodeId = nodeParams.privateKey.publicKey,
                 alias = nodeParams.alias,
                 port = config.getInt("server.port"),
                 chainHash = nodeParams.chainHash,
                 blockHeight = Globals.blockCount.intValue())
-            }
-          }
+          )
 
           override def appKit: Kit = kit
         }

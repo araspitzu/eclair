@@ -16,6 +16,7 @@ import fr.acinq.eclair.payment._
 import fr.acinq.eclair.router.Announcements
 import fr.acinq.eclair.transactions._
 import fr.acinq.eclair.wire.{ChannelReestablish, _}
+import nl.grons.metrics4.scala.{ActorInstrumentedLifeCycle, DefaultInstrumented, ReceiveCounterActor, ReceiveTimerActor}
 import org.bitcoinj.script.{Script => BitcoinjScript}
 
 import scala.concurrent.ExecutionContext
@@ -28,7 +29,7 @@ import scala.util.{Failure, Left, Random, Success, Try}
   */
 
 object Channel {
-  def props(nodeParams: NodeParams, wallet: EclairWallet, remoteNodeId: PublicKey, blockchain: ActorRef, router: ActorRef, relayer: ActorRef) = Props(new Channel(nodeParams, wallet, remoteNodeId, blockchain, router, relayer))
+  def props(nodeParams: NodeParams, wallet: EclairWallet, remoteNodeId: PublicKey, blockchain: ActorRef, router: ActorRef, relayer: ActorRef) = Props(new ChannelInstrumented(nodeParams, wallet, remoteNodeId, blockchain, router, relayer))
 
   // see https://github.com/lightningnetwork/lightning-rfc/blob/master/07-routing-gossip.md#requirements
   val ANNOUNCEMENTS_MINCONF = 6
@@ -45,7 +46,16 @@ object Channel {
 
 }
 
-class Channel(val nodeParams: NodeParams, wallet: EclairWallet, remoteNodeId: PublicKey, blockchain: ActorRef, router: ActorRef, relayer: ActorRef)(implicit ec: ExecutionContext = ExecutionContext.Implicits.global) extends LoggingFSM[State, Data] with FSMDiagnosticActorLogging[State, Data] {
+class ChannelInstrumented(override val nodeParams: NodeParams, wallet: EclairWallet, remoteNodeId: PublicKey, blockchain: ActorRef, router: ActorRef, relayer: ActorRef)(implicit ec: ExecutionContext = ExecutionContext.Implicits.global)
+  extends Channel(nodeParams, wallet, remoteNodeId, blockchain, router, relayer)
+    with ActorInstrumentedLifeCycle
+    with ReceiveTimerActor
+    with ReceiveCounterActor
+
+class Channel(val nodeParams: NodeParams, wallet: EclairWallet, remoteNodeId: PublicKey, blockchain: ActorRef, router: ActorRef, relayer: ActorRef)(implicit ec: ExecutionContext = ExecutionContext.Implicits.global)
+  extends LoggingFSM[State, Data]
+    with FSMDiagnosticActorLogging[State, Data]
+    with DefaultInstrumented {
 
   import Channel._
 

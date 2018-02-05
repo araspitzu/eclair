@@ -14,6 +14,7 @@ import fr.acinq.eclair.io.Peer
 import fr.acinq.eclair.payment.PaymentRequest.ExtraHop
 import fr.acinq.eclair.transactions.Scripts
 import fr.acinq.eclair.wire._
+import nl.grons.metrics4.scala.DefaultInstrumented
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath
 import org.jgrapht.ext._
 import org.jgrapht.graph.{DefaultDirectedGraph, DefaultEdge, SimpleGraph}
@@ -62,11 +63,17 @@ case object TickPruneStaleChannels
   * Created by PM on 24/05/2016.
   */
 
-class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data] {
+class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data] with DefaultInstrumented {
 
   import Router._
 
   import ExecutionContext.Implicits.global
+  
+  private[this] lazy val metricsRoutingMessages = metrics.meter("router.RoutingMessagesMeter")
+  private[this] lazy val metricsNodeAnnouncement = metrics.meter("router.NodeAnnouncement")
+  private[this] lazy val metricsChannelUpdate = metrics.meter("router.ChannelUpdate")
+  private[this] lazy val metricsChannelAnnouncement = metrics.meter("router.ChannelAnnouncement")
+  private[this] lazy val metricsFindRouteTimer = metrics.timer("router.FindRoute")
 
   context.system.eventStream.subscribe(self, classOf[LocalChannelUpdate])
   context.system.eventStream.subscribe(self, classOf[LocalChannelDown])
@@ -237,6 +244,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       stay using d.copy(sendingState = d.sendingState - actor)
 
     case Event(c: ChannelAnnouncement, d) =>
+      metricsChannelAnnouncement.mark
       log.debug(s"received channel announcement for shortChannelId=${c.shortChannelId.toHexString} nodeId1=${c.nodeId1} nodeId2=${c.nodeId2} from $sender")
       if (d.channels.containsKey(c.shortChannelId) || d.awaiting.keys.exists(_.shortChannelId == c.shortChannelId) || d.stash.channels.contains(c)) {
         log.debug("ignoring {} (duplicate)", c)
@@ -251,6 +259,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       }
 
     case Event(n: NodeAnnouncement, d: Data) =>
+      metricsNodeAnnouncement.mark
       log.debug(s"received node announcement for nodeId=${n.nodeId} from $sender")
       if (d.nodes.containsKey(n.nodeId) && d.nodes(n.nodeId).timestamp >= n.timestamp) {
         log.debug("ignoring {} (old timestamp or duplicate)", n)
@@ -280,6 +289,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       }
 
     case Event(u: ChannelUpdate, d: Data) =>
+      metricsChannelUpdate.mark
       log.debug(s"received channel update for shortChannelId=${u.shortChannelId.toHexString} from $sender")
       if (d.channels.contains(u.shortChannelId)) {
         val publicChannel = true
@@ -356,7 +366,9 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       if (d.rebroadcast.isEmpty) {
         stay
       } else {
-        log.info(s"broadcasting ${d.rebroadcast.size} routing messages")
+        val rebroadcastSize = d.rebroadcast.size
+        metricsRoutingMessages.mark(rebroadcastSize)
+        log.info(s"broadcasting $rebroadcastSize routing messages")
         context.actorSelection(context.system / "*" / "switchboard") ! Rebroadcast(d.rebroadcast)
         stay using d.copy(rebroadcast = Queue.empty)
       }
@@ -427,7 +439,10 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       // we also filter out disabled channels, and channels/nodes that are blacklisted for this particular request
       val updates3 = filterUpdates(updates2, ignoreNodes, ignoreChannels)
       log.info(s"finding a route $start->$end with ignoreNodes=${ignoreNodes.map(_.toBin).mkString(",")} ignoreChannels=${ignoreChannels.map(_.toHexString).mkString(",")}")
-      findRoute(start, end, updates3).map(r => RouteResponse(r, ignoreNodes, ignoreChannels)) pipeTo sender
+      val routeF = metricsFindRouteTimer.timeFuture {
+        findRoute(start, end, updates3)
+      }
+      routeF.map(r => RouteResponse(r, ignoreNodes, ignoreChannels)) pipeTo sender
       stay
   }
 

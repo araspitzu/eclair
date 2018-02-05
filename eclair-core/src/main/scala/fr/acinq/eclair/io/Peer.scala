@@ -11,6 +11,7 @@ import fr.acinq.eclair.channel._
 import fr.acinq.eclair.crypto.TransportHandler.Listener
 import fr.acinq.eclair.router.{Rebroadcast, SendRoutingState}
 import fr.acinq.eclair.wire
+import nl.grons.metrics4.scala.DefaultInstrumented
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -18,10 +19,27 @@ import scala.util.Random
 /**
   * Created by PM on 26/08/2016.
   */
-class Peer(nodeParams: NodeParams, remoteNodeId: PublicKey, previousKnownAddress: Option[InetSocketAddress], authenticator: ActorRef, watcher: ActorRef, router: ActorRef, relayer: ActorRef, wallet: EclairWallet, storedChannels: Set[HasCommitments]) extends LoggingFSM[Peer.State, Peer.Data] {
+class Peer(
+            nodeParams: NodeParams,
+            remoteNodeId: PublicKey,
+            previousKnownAddress: Option[InetSocketAddress],
+            authenticator: ActorRef,
+            watcher: ActorRef,
+            router: ActorRef,
+            relayer: ActorRef,
+            wallet: EclairWallet,
+            storedChannels: Set[HasCommitments])
+  extends LoggingFSM[Peer.State, Peer.Data]
+  with DefaultInstrumented {
 
   import Peer._
 
+  private[this] lazy val metricsPeerPingEvent = metrics.meter("peer.ping")
+  private[this] lazy val metricsPeerPongEvent = metrics.meter("peer.pong")
+  private[this] lazy val metricsPeerErrorEvent = metrics.meter("peer.pong")
+  
+  
+  
   startWith(DISCONNECTED, DisconnectedData(address_opt = previousKnownAddress, channels = storedChannels.map { state =>
     val channel = spawnChannel(nodeParams, context.system.deadLetters)
     channel ! INPUT_RESTORED(state)
@@ -115,22 +133,26 @@ class Peer(nodeParams: NodeParams, remoteNodeId: PublicKey, previousKnownAddress
     case Event(wire.Ping(pongLength, _), ConnectedData(_, transport, _, _)) =>
       // TODO: (optional) check against the expected data size tat we requested when we sent ping messages
       if (pongLength > 0) {
+        metricsPeerPingEvent.mark
         transport ! wire.Pong(BinaryData("00" * pongLength))
       }
       stay
 
     case Event(wire.Pong(data), ConnectedData(_, _, _, _)) =>
       // TODO: compute latency for remote peer ?
+      metricsPeerPongEvent.mark
       log.debug(s"received pong with ${data.length} bytes")
       stay
 
     case Event(err@wire.Error(channelId, reason), ConnectedData(_, transport, _, channels)) if channelId == CHANNELID_ZERO =>
+      metricsPeerErrorEvent.mark
       log.error(s"connection-level error, failing all channels! reason=${new String(reason)}")
       channels.values.foreach(_ forward err)
       transport ! PoisonPill
       stay
 
     case Event(msg: wire.Error, ConnectedData(_, transport, _, channels)) =>
+      metricsPeerErrorEvent.mark
       // error messages are a bit special because they can contain either temporaryChannelId or channelId (see BOLT 1)
       channels.get(FinalChannelId(msg.channelId)).orElse(channels.get(TemporaryChannelId(msg.channelId))) match {
         case Some(channel) => channel forward msg
