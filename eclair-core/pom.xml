@@ -205,6 +205,11 @@
             <version>${metrics.scala.version}</version>
         </dependency>
         <dependency>
+            <groupId>io.dropwizard.metrics</groupId>
+            <artifactId>metrics-jvm</artifactId>
+            <version>${metrics.scala.version}</version>
+        </dependency>
+        <dependency>
             <groupId>com.izettle</groupId>
             <artifactId>metrics-influxdb</artifactId>
             <version>${izettle.influxdb.version}</version>
