@@ -12,11 +12,11 @@ object Reporting extends DefaultInstrumented with Logging {
   
   private lazy val metricsRegistry = (new DefaultInstrumented{}).metricRegistry
 
-  private[this] lazy val metricsJvmMemoryUsage = com.codahale.metrics.jvm.MemoryUsageGaugeSet
-  private[this] lazy val metricsJvmCPULoad = com.codahale.metrics.jvm.CpuTimeClock
-  private[this] lazy val metricsJvmBufferPool = com.codahale.metrics.jvm.BufferPoolMetricSet
-  private[this] lazy val metricsJvmGC = com.codahale.metrics.jvm.GarbageCollectorMetricSet
-  private[this] lazy val metricsJvmThreadsStates = com.codahale.metrics.jvm.ThreadStatesGaugeSet
+  private[this] lazy val metricsJvmMemoryUsage = new com.codahale.metrics.jvm.MemoryUsageGaugeSet
+  private[this] lazy val metricsJvmCPULoad = new com.codahale.metrics.jvm.CpuTimeClock
+  //private[this] lazy val metricsJvmBufferPool = new com.codahale.metrics.jvm.BufferPoolMetricSet
+  private[this] lazy val metricsJvmGC = new com.codahale.metrics.jvm.GarbageCollectorMetricSet
+  private[this] lazy val metricsJvmThreadsStates = new com.codahale.metrics.jvm.ThreadStatesGaugeSet
   
   
   def start(conf: Config) = {
