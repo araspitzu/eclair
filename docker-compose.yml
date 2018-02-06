@@ -41,6 +41,8 @@ services:
       - "127.0.0.1:3000:3000"
     env_file:
       - 'monitoring_env.grafana'
+    volumes:
+      - ${GRAFANA_DATADIR}:/var/lib/grafana
     links:
       - influxdb
     networks:
