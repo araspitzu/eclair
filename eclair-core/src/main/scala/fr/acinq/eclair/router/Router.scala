@@ -77,6 +77,8 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
   private[this] lazy val metricsStashNodes = metrics.meter("StashNodes")
   private[this] lazy val metricsNetworkUpdates = metrics.meter("NetworkUpdates")
   private[this] lazy val metricsRebroadcastSize = metrics.meter("RebroadcastSize")
+  
+  private[this] lazy val metricsCltvExpiryDelta = metrics.meter("CltvExpiryDelta")
 
   context.system.eventStream.subscribe(self, classOf[LocalChannelUpdate])
   context.system.eventStream.subscribe(self, classOf[LocalChannelDown])
@@ -291,6 +293,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
 
     case Event(u: ChannelUpdate, d: Data) =>
       metricsChannelUpdate.mark
+      metricsCltvExpiryDelta.mark(u.cltvExpiryDelta)
       log.debug(s"received channel update for shortChannelId=${u.shortChannelId.toHexString} from $sender")
       if (d.channels.contains(u.shortChannelId)) {
         val publicChannel = true
