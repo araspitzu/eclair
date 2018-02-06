@@ -34,9 +34,9 @@ class Peer(
 
   import Peer._
 
-  private[this] lazy val metricsPeerPingEvent = metrics.meter("peer.ping")
-  private[this] lazy val metricsPeerPongEvent = metrics.meter("peer.pong")
-  private[this] lazy val metricsPeerErrorEvent = metrics.meter("peer.pong")
+  private[this] lazy val metricsPeerPingEvent = metrics.meter("Ping")
+  private[this] lazy val metricsPeerPongEvent = metrics.meter("Pong")
+  private[this] lazy val metricsPeerErrorEvent = metrics.meter("Error")
   
   
   
