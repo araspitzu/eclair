@@ -215,7 +215,7 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
         Future.successful(logger.info("json-rpc api is disabled"))
       }
     } yield {
-      Reporting.start(config)
+      Reporting.start(config, system)
       kit
     }
   }
