@@ -14,8 +14,9 @@ object Reporting extends DefaultInstrumented with Logging {
   
   private lazy val metricsRegistry = (new DefaultInstrumented{}).metricRegistry
   
-  private lazy val metricsJvmMemory = metrics.histogram("jvm.UsedPhysicalMemory")
-  private lazy val metricsCPULoad = metrics.histogram("jvm.CpuLoad")
+  private lazy val metricsJvmMemoryUsed = metrics.histogram("UsedPhysicalMemory")
+  private lazy val metricsJvmProcessCPULoad = metrics.histogram("JvmCpuLoad")
+  private lazy val metricsJvmSystemCPULoad = metrics.histogram("SystemCpuLoad")
   
   private lazy val osBean = ManagementFactory.getPlatformMXBean(classOf[OperatingSystemMXBean])
   
@@ -41,10 +42,10 @@ object Reporting extends DefaultInstrumented with Logging {
       logger.info("Starting metrics reporter")
       
       actorSystem.scheduler.schedule(3 seconds, 3 seconds) {
-        val usedMemory = osBean.getFreePhysicalMemorySize / osBean.getTotalPhysicalMemorySize * 100
-        logger.info(s"reporting used memory: $usedMemory")
-        metricsJvmMemory += osBean.getFreePhysicalMemorySize / osBean.getTotalPhysicalMemorySize * 100
-        metricsCPULoad += osBean.getProcessCpuLoad.toLong * 100L
+  
+        metricsJvmMemoryUsed += osBean.getTotalPhysicalMemorySize - osBean.getFreePhysicalMemorySize
+        metricsJvmProcessCPULoad += (osBean.getProcessCpuLoad * 100).toLong
+        metricsJvmSystemCPULoad += (osBean.getSystemCpuLoad * 100).toLong
       }
       
       
