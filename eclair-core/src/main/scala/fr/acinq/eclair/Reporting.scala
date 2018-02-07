@@ -25,33 +25,33 @@ object Reporting extends DefaultInstrumented with Logging {
     
     val isMonitoringEnabled = conf.getBoolean("monitoring.enabled")
     logger.info(s"Monitoring enabled:${isMonitoringEnabled}")
-    
-    lazy val influxDbSender = new InfluxDbHttpSender(
-      conf.getString("monitoring.influxDb.protocol"),
-      conf.getString("monitoring.influxDb.host"),
-      conf.getInt("monitoring.influxDb.port"),
-      conf.getString("monitoring.influxDb.database"),
-      conf.getString("monitoring.influxDb.authstring"),
-      TimeUnit.MILLISECONDS,
-      1000,
-      1000,
-      ""
-    )
 
     if(isMonitoringEnabled){
       logger.info("Starting metrics reporter")
-      
-      actorSystem.scheduler.schedule(3 seconds, 3 seconds) {
   
-        metricsJvmMemoryUsed += osBean.getTotalPhysicalMemorySize - osBean.getFreePhysicalMemorySize
-        metricsJvmProcessCPULoad += (osBean.getProcessCpuLoad * 100).toLong
-        metricsJvmSystemCPULoad += (osBean.getSystemCpuLoad * 100).toLong
-      }
-      
+      lazy val influxDbSender = new InfluxDbHttpSender(
+        conf.getString("monitoring.influxDb.protocol"),
+        conf.getString("monitoring.influxDb.host"),
+        conf.getInt("monitoring.influxDb.port"),
+        conf.getString("monitoring.influxDb.database"),
+        conf.getString("monitoring.influxDb.authstring"),
+        TimeUnit.MILLISECONDS,
+        1000,
+        1000,
+        ""
+      )
       
       val influxDbReporter = InfluxDbReporter.forRegistry(metricRegistry).build(influxDbSender)
       influxDbReporter.start(3, TimeUnit.SECONDS)
-
+  
+      influxDbReporter.report()
+      
+      actorSystem.scheduler.schedule(3 seconds, 3 seconds) {
+    
+        metricsJvmMemoryUsed += (osBean.getTotalPhysicalMemorySize - osBean.getFreePhysicalMemorySize) / 10000 //MB
+        metricsJvmProcessCPULoad += (osBean.getProcessCpuLoad * 100).toLong
+        metricsJvmSystemCPULoad += (osBean.getSystemCpuLoad * 100).toLong
+      }
     }
     
   }

@@ -24,6 +24,7 @@ import fr.acinq.eclair.io.{Authenticator, Server, Switchboard}
 import fr.acinq.eclair.payment._
 import fr.acinq.eclair.router._
 import grizzled.slf4j.Logging
+import nl.grons.metrics4.scala.DefaultInstrumented
 
 import scala.collection.JavaConversions._
 import scala.concurrent.duration._
@@ -39,7 +40,7 @@ import scala.concurrent.{Await, ExecutionContext, Future, Promise}
   * @param actorSystem
   * @param seed_opt optional seed, if set eclair will use it instead of generating one and won't create a seed.dat file.
   */
-class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), actorSystem: ActorSystem = ActorSystem(), seed_opt: Option[BinaryData] = None) extends Logging {
+class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), actorSystem: ActorSystem = ActorSystem(), seed_opt: Option[BinaryData] = None) extends Logging with DefaultInstrumented {
 
   logger.info(s"hello!")
   logger.info(s"version=${getClass.getPackage.getImplementationVersion} commit=${getClass.getPackage.getSpecificationVersion}")
@@ -115,6 +116,13 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
     val zmqConnected = Promise[Boolean]()
     val tcpBound = Promise[Unit]()
 
+    val metricsFeeRateByte_block1 = metrics.meter("FeeRateByte_block1")
+    val metricsFeeRateByte_block2 = metrics.meter("FeeRateByte_block2")
+    val metricsFeeRateByte_block6 = metrics.meter("FeeRateByte_block6")
+    val metricsFeeRateByte_block12 = metrics.meter("FeeRateByte_block12")
+    val metricsFeeRateByte_block36 = metrics.meter("FeeRateByte_block36")
+    val metricsFeeRateByte_block72 = metrics.meter("FeeRateByte_block72")
+    
     val defaultFeerates = FeeratesPerByte(block_1 = config.getLong("default-feerates.delay-blocks.1"), blocks_2 = config.getLong("default-feerates.delay-blocks.2"), blocks_6 = config.getLong("default-feerates.delay-blocks.6"), blocks_12 = config.getLong("default-feerates.delay-blocks.12"), blocks_36 = config.getLong("default-feerates.delay-blocks.36"), blocks_72 = config.getLong("default-feerates.delay-blocks.72"))
     Globals.feeratesPerByte.set(defaultFeerates)
     Globals.feeratesPerKw.set(FeeratesPerKw(defaultFeerates))
@@ -130,6 +138,12 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
         Globals.feeratesPerKw.set(FeeratesPerKw(defaultFeerates))
         system.eventStream.publish(CurrentFeerates(Globals.feeratesPerKw.get))
         logger.info(s"current feeratesPerByte=${Globals.feeratesPerByte.get()}")
+        metricsFeeRateByte_block1.mark(feerates.block_1)
+        metricsFeeRateByte_block2.mark(feerates.blocks_2)
+        metricsFeeRateByte_block6.mark(feerates.blocks_6)
+        metricsFeeRateByte_block12.mark(feerates.blocks_12)
+        metricsFeeRateByte_block36.mark(feerates.blocks_36)
+        metricsFeeRateByte_block72.mark(feerates.blocks_72)
     })
 
     val watcher = bitcoin match {
