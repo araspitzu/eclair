@@ -69,16 +69,12 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
 
   import ExecutionContext.Implicits.global
   
-  private[this] lazy val metricsChannelUpdate = metrics.meter("ChannelUpdate")
   private[this] lazy val metricsFindRouteTimer = metrics.timer("FindRoute")
-  private[this] lazy val metricsKnownChannels = metrics.meter("KnownChannels")
-  private[this] lazy val metricsStashChannels = metrics.meter("StashChannels")
-  private[this] lazy val metricsKnownNodes = metrics.meter("KnownNodes")
-  private[this] lazy val metricsStashNodes = metrics.meter("StashNodes")
-  private[this] lazy val metricsNetworkUpdates = metrics.meter("NetworkUpdates")
-  private[this] lazy val metricsRebroadcastSize = metrics.meter("RebroadcastSize")
-  
-  private[this] lazy val metricsCltvExpiryDelta = metrics.meter("CltvExpiryDelta")
+  private[this] lazy val metricsKnownChannels = metrics.histogram("KnownChannels")
+  private[this] lazy val metricsKnownNodes = metrics.histogram("KnownNodes")
+  private[this] lazy val metricsNetworkUpdates = metrics.histogram("NetworkUpdates")
+  private[this] lazy val metricsRebroadcastSize = metrics.histogram("RebroadcastSize")
+  private[this] lazy val metricsCltvExpiryDelta = metrics.histogram("CltvExpiryDelta")
 
   context.system.eventStream.subscribe(self, classOf[LocalChannelUpdate])
   context.system.eventStream.subscribe(self, classOf[LocalChannelDown])
@@ -292,8 +288,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       }
 
     case Event(u: ChannelUpdate, d: Data) =>
-      metricsChannelUpdate.mark
-      metricsCltvExpiryDelta.mark(u.cltvExpiryDelta)
+      metricsCltvExpiryDelta += u.cltvExpiryDelta
       log.debug(s"received channel update for shortChannelId=${u.shortChannelId.toHexString} from $sender")
       if (d.channels.contains(u.shortChannelId)) {
         val publicChannel = true
@@ -451,12 +446,10 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
   onTransition {
     case _ -> NORMAL =>
       
-      metricsKnownChannels.mark(nextStateData.channels.size)
-      metricsStashChannels.mark(nextStateData.stash.channels.size)
-      metricsKnownNodes.mark(nextStateData.nodes.size)
-      metricsStashNodes.mark(nextStateData.nodes.size)
-      metricsNetworkUpdates.mark(nextStateData.updates.size)
-      metricsRebroadcastSize.mark(nextStateData.rebroadcast.size)
+      metricsKnownChannels += nextStateData.channels.size
+      metricsKnownNodes += nextStateData.nodes.size
+      metricsNetworkUpdates += nextStateData.updates.size
+      metricsRebroadcastSize += nextStateData.rebroadcast.size
       
       log.info(s"current status channels=${nextStateData.channels.size} nodes=${nextStateData.nodes.size} updates=${nextStateData.updates.size} privateChannels=${nextStateData.privateChannels.size} privateUpdates=${nextStateData.privateUpdates.size}")
       log.info(s"children=${context.children.size} rebroadcast=${nextStateData.rebroadcast.size} stash.channels=${nextStateData.stash.channels.size} stash.nodes=${nextStateData.stash.nodes.size} stash.updates=${nextStateData.stash.updates.size} awaiting=${nextStateData.awaiting.size} excludedChannels=${nextStateData.excludedChannels.size}")
