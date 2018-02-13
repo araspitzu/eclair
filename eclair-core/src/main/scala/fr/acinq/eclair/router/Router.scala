@@ -75,6 +75,14 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
   private[this] lazy val metricsNetworkUpdates = metrics.histogram("NetworkUpdates")
   private[this] lazy val metricsRebroadcastSize = metrics.histogram("RebroadcastSize")
   private[this] lazy val metricsCltvExpiryDelta = metrics.histogram("CltvExpiryDelta")
+  
+  val metricsCache = scala.collection.mutable.Map[String, Long]()
+  
+  //Gauge
+  metrics.gauge("RebroadcastSizeGauge"){ metricsCache("RebroadcastSizeGauge") }
+  metrics.gauge("NetworkUpdatesGauge"){ metricsCache("NetworkUpdatesGauge") }
+  
+  
 
   context.system.eventStream.subscribe(self, classOf[LocalChannelUpdate])
   context.system.eventStream.subscribe(self, classOf[LocalChannelDown])
@@ -445,6 +453,9 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
 
   onTransition {
     case _ -> NORMAL =>
+  
+      metricsCache += "NetworkUpdatesGauge" -> nextStateData.updates.size
+      metricsCache += "RebroadcastSizeGauge" -> nextStateData.rebroadcast.size
       
       metricsKnownChannels += nextStateData.channels.size
       metricsKnownNodes += nextStateData.nodes.size
