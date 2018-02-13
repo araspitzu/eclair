@@ -812,6 +812,8 @@ class Channel(val nodeParams: NodeParams, wallet: EclairWallet, remoteNodeId: Pu
    */
 
   when(SHUTDOWN)(handleExceptions {
+    //Events from wire.* are messages received from the other peer
+    //Events subclass of Command are messages from us
     case Event(c: CMD_FULFILL_HTLC, d: DATA_SHUTDOWN) =>
       Try(Commitments.sendFulfill(d.commitments, c)) match {
         case Success((commitments1, fulfill)) =>
