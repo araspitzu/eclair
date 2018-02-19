@@ -25,3 +25,6 @@ target/
 project/target
 DeleteMe*.*
 *~
+
+monitoring_env.eclair
+monitoring_env.grafana

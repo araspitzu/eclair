@@ -1,0 +1,4 @@
+GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+GF_ADMIN_PASSWORD=
+GF_ADMIN_USER=admin
+GF_SERVER_DOMAIN=localhost

@@ -9,8 +9,6 @@ services:
     env_file:
       - 'monitoring_env.influxdb'
     volumes:
-      # Data persistency
-      # sudo mkdir -p /srv/docker/influxdb/data
       - ${INFLUXDB_DATADIR}:/var/lib/influxdb
     networks:
       virt:
@@ -24,9 +22,8 @@ services:
       - "9735:9735"
       - "127.0.0.1:8080:8080"
     env_file:
-      - "monitoring_env.eclair"
+      - "monitoring_env.eclair.example"
     volumes:
-      # Mount eclair's container data dir into /var/lib/eclair-node
       - ${ECLAIR_DATADIR}:/data
     links:
       - influxdb
@@ -40,7 +37,7 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     env_file:
-      - 'monitoring_env.grafana'
+      - 'monitoring_env.grafana.example'
     volumes:
       - ${GRAFANA_DATADIR}:/var/lib/grafana
     links:
