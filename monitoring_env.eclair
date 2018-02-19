@@ -1,17 +1,1 @@
-JAVA_OPTS="
--Declair.watcher-type=bitcoind
-
--Declair.bitcoind.host=10.5.0.5
--Declair.bitcoind.rpcuser=btcrpcuser
--Declair.bitcoind.rpcpassword=
-
--Declair.api.binding-ip=0.0.0.0
--Declair.api.enabled=true
--Declair.api.password=
-
--Declair.node-alias=eclair
--Declair.printToConsole
--Declair.monitoring.enabled=true
--Declair.monitoring.influxDb.database=metrics
--Declair.monitoring.influxDb.host=10.5.0.2
-"
+JAVA_OPTS=-Declair.watcher-type=bitcoind  -Declair.bitcoind.rpcuser=btcrpcuser -Declair.bitcoind.rpcpassword=td8XJHW -Declair.api.binding-ip=0.0.0.0 -Declair.api.enabled=true -Declair.api.password=asd -Declair.node-alias=eclair -Declair.printToConsole -Declair.monitoring.enabled=true -Declair.monitoring.influxDb.database=metrics -Declair.monitoring.influxDb.host=10.5.0.2
