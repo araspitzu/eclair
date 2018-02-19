@@ -22,7 +22,7 @@ services:
       - "9735:9735"
       - "127.0.0.1:8080:8080"
     env_file:
-      - "monitoring_env.eclair.example"
+      - "monitoring_env.eclair"
     volumes:
       - ${ECLAIR_DATADIR}:/data
     links:
@@ -37,7 +37,7 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     env_file:
-      - 'monitoring_env.grafana.example'
+      - 'monitoring_env.grafana'
     volumes:
       - ${GRAFANA_DATADIR}:/var/lib/grafana
     links:
