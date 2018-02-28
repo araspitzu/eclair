@@ -10,10 +10,6 @@ services:
       - 'monitoring_env.influxdb'
     volumes:
       - ${INFLUXDB_DATADIR}:/var/lib/influxdb
-    networks:
-      virt:
-        ipv4_address: 10.5.0.2
-
 
   eclair:
     build: .
@@ -27,9 +23,6 @@ services:
       - ${ECLAIR_DATADIR}:/data
     links:
       - influxdb
-    networks:
-      virt:
-        ipv4_address: 10.5.0.3
 
   grafana:
     image: grafana/grafana:latest
@@ -42,14 +35,3 @@ services:
       - ${GRAFANA_DATADIR}:/var/lib/grafana
     links:
       - influxdb
-    networks:
-      virt:
-        ipv4_address: 10.5.0.4
-
-networks:
-  virt:
-    driver: bridge
-    ipam:
-     config:
-       - subnet: 10.5.0.0/16
-         gateway: 10.5.0.1
