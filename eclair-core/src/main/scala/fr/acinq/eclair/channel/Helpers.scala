@@ -444,7 +444,14 @@ object Helpers {
             Transactions.addSigs(txinfo, sig)
           })
 
-          // TODO: we don't claim htlcs outputs yet
+          // Then we get back the unresolved HTLCs via 2nd stage HTLC-TX
+          val htlcPenaltyTxs = generateTx("htlc-penalty")(Try{
+            val htlcsAndSigs = commitments.localCommit.publishableTxs.htlcTxsAndSigs
+            require(htlcsAndSigs.forall(el => Transactions.checkSpendable(el.txinfo).isSuccess))
+            
+            
+            ???
+          })
 
           // OPTIONAL: let's check transactions are actually spendable
           //val txes = mainDelayedRevokedTx :: Nil

@@ -311,7 +311,22 @@ object Transactions {
       lockTime = 0))
   }
 
-  def makeHtlcPenaltyTx(commitTx: Transaction, localDustLimit: Satoshi): HtlcPenaltyTx = ???
+  def makeHtlcPenaltyTx(commitTx: Transaction, localDustLimit: Satoshi, remoteRevocationPubkey: PublicKey): HtlcPenaltyTx = {
+    //TODO divide HTLC-Success and HTLC-Timeout
+    val htlcSuccessFee = weight2fee(2, htlcSuccessWeight)
+    
+    val redeemScript =
+    
+    HtlcPenaltyTx(
+      input = ???,
+      tx = Transaction(
+        version = 2,
+        txIn = Seq.empty,
+        txOut = Seq.empty,
+        lockTime = 0
+      )
+    )
+  }
 
   def makeClosingTx(commitTxInput: InputInfo, localScriptPubKey: BinaryData, remoteScriptPubKey: BinaryData, localIsFunder: Boolean, dustLimit: Satoshi, closingFee: Satoshi, spec: CommitmentSpec): ClosingTx = {
     require(spec.htlcs.isEmpty, "there shouldn't be any pending htlcs")
