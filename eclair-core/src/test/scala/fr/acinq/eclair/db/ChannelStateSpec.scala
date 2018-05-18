@@ -1,16 +1,32 @@
+/*
+ * Copyright 2018 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.acinq.eclair.db
 
 import fr.acinq.bitcoin.Crypto.{PrivateKey, Scalar}
-import fr.acinq.bitcoin.{BinaryData, Crypto, DeterministicWallet, MilliSatoshi, Satoshi, Transaction}
+import fr.acinq.bitcoin.{BinaryData, Block, Crypto, DeterministicWallet, MilliSatoshi, Satoshi, Transaction}
 import fr.acinq.eclair.channel.Helpers.Funding
 import fr.acinq.eclair.channel._
 import fr.acinq.eclair.crypto.{LocalKeyManager, ShaChain, Sphinx}
 import fr.acinq.eclair.payment.{Local, Relayed}
-import fr.acinq.eclair.{UInt64, randomKey}
 import fr.acinq.eclair.router.Announcements
 import fr.acinq.eclair.transactions.Transactions.CommitTx
 import fr.acinq.eclair.transactions._
 import fr.acinq.eclair.wire.{ChannelCodecs, UpdateAddHtlc}
+import fr.acinq.eclair.{ShortChannelId, UInt64, randomKey}
 import org.junit.runner.RunWith
 import org.scalatest.FunSuite
 import org.scalatest.junit.JUnitRunner
@@ -33,10 +49,10 @@ class ChannelStateSpec extends FunSuite {
 }
 
 object ChannelStateSpec {
-  val keyManager = new LocalKeyManager("01" * 32)
+  val keyManager = new LocalKeyManager("01" * 32, Block.RegtestGenesisBlock.hash)
   val localParams = LocalParams(
     keyManager.nodeId,
-    channelKeyPath = DeterministicWallet.KeyPath(Seq(42)),
+    channelKeyPath = DeterministicWallet.KeyPath(Seq(42L)),
     dustLimitSatoshis = Satoshi(546).toLong,
     maxHtlcValueInFlightMsat = UInt64(50),
     channelReserveSatoshis = 10000,
@@ -93,7 +109,7 @@ object ChannelStateSpec {
     remoteNextCommitInfo = Right(randomKey.publicKey),
     commitInput = commitmentInput, remotePerCommitmentSecrets = ShaChain.init, channelId = "00" * 32)
 
-  val channelUpdate = Announcements.makeChannelUpdate("11" * 32, randomKey, randomKey.publicKey, 142553, 42, 15, 575, 53)
+  val channelUpdate = Announcements.makeChannelUpdate("11" * 32, randomKey, randomKey.publicKey, ShortChannelId(142553), 42, 15, 575, 53)
 
-  val normal = DATA_NORMAL(commitments, 42, true, None, channelUpdate, None, None)
+  val normal = DATA_NORMAL(commitments, ShortChannelId(42), true, None, channelUpdate, None, None)
 }

@@ -1,20 +1,36 @@
+/*
+ * Copyright 2018 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.acinq.eclair.gui.controllers
 
 import java.lang.Boolean
+
+import com.google.common.base.Strings
+import fr.acinq.bitcoin.{Satoshi, _}
+import fr.acinq.eclair.channel.{Channel, ChannelFlags}
+import fr.acinq.eclair.gui.utils.Constants
+import fr.acinq.eclair.gui.{FxApp, Handlers}
+import fr.acinq.eclair.io.{NodeURI, Peer}
+import fr.acinq.eclair.{CoinUtils, Globals}
+import grizzled.slf4j.Logging
 import javafx.beans.value.{ChangeListener, ObservableValue}
 import javafx.event.ActionEvent
 import javafx.fxml.FXML
 import javafx.scene.control._
 import javafx.stage.Stage
-
-import com.google.common.base.Strings
-import fr.acinq.bitcoin.{Satoshi, _}
-import fr.acinq.eclair.{CoinUtils, Globals}
-import fr.acinq.eclair.channel.{Channel, ChannelFlags}
-import fr.acinq.eclair.gui.utils.Constants
-import fr.acinq.eclair.gui.{FxApp, Handlers}
-import fr.acinq.eclair.io.{NodeURI, Peer}
-import grizzled.slf4j.Logging
 
 import scala.util.{Failure, Success, Try}
 
@@ -38,7 +54,7 @@ class OpenChannelController(val handlers: Handlers, val stage: Stage) extends Lo
   @FXML def initialize() = {
     fundingUnit.setItems(Constants.FX_UNITS_ARRAY_NO_MSAT)
     fundingUnit.setValue(FxApp.getUnit.label)
-    feerateField.setText(Globals.feeratesPerByte.get().blocks_6.toString)
+    feerateField.setText((Globals.feeratesPerKB.get().blocks_6 / 1000).toString)
 
     simpleConnection.selectedProperty.addListener(new ChangeListener[Boolean] {
       override def changed(observable: ObservableValue[_ <: Boolean], oldValue: Boolean, newValue: Boolean) = {

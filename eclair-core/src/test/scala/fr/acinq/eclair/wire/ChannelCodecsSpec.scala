@@ -1,3 +1,19 @@
+/*
+ * Copyright 2018 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.acinq.eclair.wire
 
 import fr.acinq.bitcoin.DeterministicWallet.KeyPath
@@ -27,7 +43,7 @@ class ChannelCodecsSpec extends FunSuite {
   }
 
   test("encode/decode key paths (all 0s)") {
-    val keyPath = KeyPath(Seq(0, 0, 0, 0))
+    val keyPath = KeyPath(Seq(0L, 0L, 0L, 0L))
     val encoded = keyPathCodec.encode(keyPath).require
     val decoded = keyPathCodec.decode(encoded).require
     assert(keyPath === decoded.value)
@@ -43,7 +59,7 @@ class ChannelCodecsSpec extends FunSuite {
   test("encode/decode localparams") {
     val o = LocalParams(
       nodeId = randomKey.publicKey,
-      channelKeyPath = DeterministicWallet.KeyPath(Seq(42)),
+      channelKeyPath = DeterministicWallet.KeyPath(Seq(42L)),
       dustLimitSatoshis = Random.nextInt(Int.MaxValue),
       maxHtlcValueInFlightMsat = UInt64(Random.nextInt(Int.MaxValue)),
       channelReserveSatoshis = Random.nextInt(Int.MaxValue),

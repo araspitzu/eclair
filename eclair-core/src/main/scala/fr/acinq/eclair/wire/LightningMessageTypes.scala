@@ -1,10 +1,26 @@
+/*
+ * Copyright 2018 ACINQ SAS
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package fr.acinq.eclair.wire
 
-import java.net.InetSocketAddress
+import java.net.{Inet4Address, Inet6Address, InetSocketAddress}
 
 import fr.acinq.bitcoin.BinaryData
 import fr.acinq.bitcoin.Crypto.{Point, PublicKey, Scalar}
-import fr.acinq.eclair.UInt64
+import fr.acinq.eclair.{ShortChannelId, UInt64}
 
 /**
   * Created by PM on 15/11/2016.
@@ -121,7 +137,7 @@ case class UpdateFee(channelId: BinaryData,
                      feeratePerKw: Long) extends ChannelMessage with UpdateMessage with HasChannelId
 
 case class AnnouncementSignatures(channelId: BinaryData,
-                                  shortChannelId: Long,
+                                  shortChannelId: ShortChannelId,
                                   nodeSignature: BinaryData,
                                   bitcoinSignature: BinaryData) extends RoutingMessage with HasChannelId
 
@@ -131,7 +147,7 @@ case class ChannelAnnouncement(nodeSignature1: BinaryData,
                                bitcoinSignature2: BinaryData,
                                features: BinaryData,
                                chainHash: BinaryData,
-                               shortChannelId: Long,
+                               shortChannelId: ShortChannelId,
                                nodeId1: PublicKey,
                                nodeId2: PublicKey,
                                bitcoinKey1: PublicKey,
@@ -141,18 +157,38 @@ case class Color(r: Byte, g: Byte, b: Byte) {
   override def toString: String = f"#$r%02x$g%02x$b%02x" // to hexa s"#  ${r}%02x ${r & 0xFF}${g & 0xFF}${b & 0xFF}"
 }
 
+// @formatter:off
+sealed trait NodeAddress
+case object NodeAddress {
+  def apply(inetSocketAddress: InetSocketAddress): NodeAddress = inetSocketAddress.getAddress match {
+    case a: Inet4Address => IPv4(a, inetSocketAddress.getPort)
+    case a: Inet6Address => IPv6(a, inetSocketAddress.getPort)
+    case _ => ??? // there are no other implementations of InetAddress
+  }
+}
+case object Padding extends NodeAddress
+case class IPv4(ipv4: Inet4Address, port: Int) extends NodeAddress
+case class IPv6(ipv6: Inet6Address, port: Int) extends NodeAddress
+case class Tor2(tor2: BinaryData, port: Int) extends NodeAddress { require(tor2.size == 10) }
+case class Tor3(tor3: BinaryData, port: Int) extends NodeAddress { require(tor3.size == 35) }
+// @formatter:on
+
 case class NodeAnnouncement(signature: BinaryData,
                             features: BinaryData,
                             timestamp: Long,
                             nodeId: PublicKey,
                             rgbColor: Color,
                             alias: String,
-                            // TODO: check address order + support padding data (type 0)
-                            addresses: List[InetSocketAddress]) extends RoutingMessage
+                            addresses: List[NodeAddress]) extends RoutingMessage {
+  def socketAddresses: List[InetSocketAddress] = addresses.collect {
+    case IPv4(a, port) => new InetSocketAddress(a, port)
+    case IPv6(a, port) => new InetSocketAddress(a, port)
+  }
+}
 
 case class ChannelUpdate(signature: BinaryData,
                          chainHash: BinaryData,
-                         shortChannelId: Long,
+                         shortChannelId: ShortChannelId,
                          timestamp: Long,
                          flags: BinaryData,
                          cltvExpiryDelta: Int,
@@ -160,6 +196,6 @@ case class ChannelUpdate(signature: BinaryData,
                          feeBaseMsat: Long,
                          feeProportionalMillionths: Long) extends RoutingMessage
 
-case class PerHopPayload(channel_id: Long,
+case class PerHopPayload(channel_id: ShortChannelId,
                          amtToForward: Long,
                          outgoingCltvValue: Long)
