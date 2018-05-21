@@ -103,7 +103,7 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
         unspentAddresses <- bitcoinClient.invoke("listunspent").collect { case JArray(values) => values.map(value => (value \ "address").extract[String]) }
       } yield (progress, chainHash, bitcoinVersion, unspentAddresses)
       // blocking sanity checks
-      val (progress, chainHash, bitcoinVersion, unspentAddresses) = Await.result(future, 10 seconds)
+      val (progress, chainHash, bitcoinVersion, unspentAddresses) = Await.result(future, 30 seconds)
       assert(bitcoinVersion.startsWith("16"), "Eclair requires Bitcoin Core 0.16.0 or higher")
       assert(chainHash == nodeParams.chainHash, s"chainHash mismatch (conf=${nodeParams.chainHash} != bitcoind=$chainHash)")
       if (chainHash != Block.RegtestGenesisBlock.hash) {
@@ -150,7 +150,7 @@ class Setup(datadir: File, overrideDefaults: Config = ConfigFactory.empty(), act
       )
       minFeeratePerByte = config.getLong("min-feerate")
       feeProvider = (nodeParams.chainHash, bitcoin) match {
-        case (Block.RegtestGenesisBlock.hash, _) => new ConstantFeeProvider(defaultFeerates)
+        case (Block.RegtestGenesisBlock.hash, _) => new FallbackFeeProvider(new ConstantFeeProvider(defaultFeerates) :: Nil, minFeeratePerByte)
         case (_, Bitcoind(bitcoinClient)) => new FallbackFeeProvider(new BitgoFeeProvider(nodeParams.chainHash) :: new EarnDotComFeeProvider() :: new BitcoinCoreFeeProvider(bitcoinClient, defaultFeerates) :: new ConstantFeeProvider(defaultFeerates) :: Nil, minFeeratePerByte) // order matters!
         case _ => new FallbackFeeProvider(new BitgoFeeProvider(nodeParams.chainHash) :: new EarnDotComFeeProvider() :: new ConstantFeeProvider(defaultFeerates) :: Nil, minFeeratePerByte) // order matters!
       }
