@@ -17,15 +17,15 @@ services:
     ports:
       - "9735:9735"
       - "127.0.0.1:8080:8080"
-    env_file:
-      - "monitoring_env.eclair"
+    environment:
+      - "JAVA_OPTS= -Declair.watcher-type=electrum -Declair.chain=testnet -Declair.api.binding-ip=0.0.0.0 -Declair.api.enabled=true -Declair.api.password=123 -Declair.node-alias=rialce -Declair.printToConsole -Declair.monitoring.enabled=true -Declair.monitoring.influxDb.database=metrics -Declair.monitoring.influxDb.host=influxdb"
     volumes:
       - ${ECLAIR_DATADIR}:/data
     links:
       - influxdb
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:5.0.4
     container_name: grafana
     ports:
       - "127.0.0.1:3000:3000"
