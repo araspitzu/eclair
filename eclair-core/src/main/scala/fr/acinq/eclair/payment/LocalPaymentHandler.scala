@@ -25,6 +25,7 @@ import fr.acinq.eclair.wire._
 
 import scala.concurrent.duration._
 import fr.acinq.eclair.{Globals, NodeParams, randomBytes}
+import nl.grons.metrics4.scala.DefaultInstrumented
 
 import scala.compat.Platform
 import scala.concurrent.ExecutionContext
@@ -33,9 +34,12 @@ import scala.util.{Failure, Success, Try}
 /**
   * Created by PM on 17/06/2016.
   */
-class LocalPaymentHandler(nodeParams: NodeParams)(implicit ec: ExecutionContext = ExecutionContext.Implicits.global) extends Actor with ActorLogging {
+class LocalPaymentHandler(nodeParams: NodeParams)(implicit ec: ExecutionContext = ExecutionContext.Implicits.global) extends Actor with ActorLogging with DefaultInstrumented {
 
   context.system.scheduler.schedule(10 minutes, 10 minutes)(self ! Platform.currentTime / 1000)
+
+  val paymentReceivedAmountMeter = metrics.meter("paymentReceivedAmountMeter")
+  val paymentReceivedCounter = metrics.counter("paymentReceivedCounter")
 
   override def receive: Receive = run(Map())
 
@@ -84,6 +88,8 @@ class LocalPaymentHandler(nodeParams: NodeParams)(implicit ec: ExecutionContext 
               sender ! CMD_FAIL_HTLC(htlc.id, Right(IncorrectPaymentAmount), commit = true)
             case _ =>
               log.info(s"received payment for paymentHash=${htlc.paymentHash} amountMsat=${htlc.amountMsat}")
+              paymentReceivedAmountMeter.mark(htlc.amountMsat)
+              paymentReceivedCounter += 1
               // amount is correct or was not specified in the payment request
               nodeParams.paymentsDb.addPayment(Payment(htlc.paymentHash, htlc.amountMsat, Platform.currentTime / 1000))
               sender ! CMD_FULFILL_HTLC(htlc.id, paymentPreimage, commit = true)
