@@ -91,9 +91,6 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
   val nodeAnnouncementMeter = metrics.meter("NodeAnnouncementMeter")
   val channelAnnouncementMeter = metrics.meter("ChannelAnnouncementMeter")
   val channelUpdateMeter = metrics.meter("ChannelUpdateMeter")
-  val nodeAnnouncementCounter = metrics.counter("NodeAnnouncementCounter")
-  val channelAnnouncementCounter = metrics.counter("ChannelAnnouncementCounter")
-  val channelUpdateCounter = metrics.counter("ChannelUpdateCounter")
 
   val routeRequestTimer = metrics.timer("RouterRequestTimer")
 
@@ -201,7 +198,6 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
     case Event(c: ChannelAnnouncement, d) =>
       log.debug("received channel announcement for shortChannelId={} nodeId1={} nodeId2={} from {}", c.shortChannelId, c.nodeId1, c.nodeId2, sender)
       channelUpdateMeter.mark()
-      channelUpdateCounter += 1
       if (d.channels.contains(c.shortChannelId)) {
         sender ! TransportHandler.ReadAck(c)
         log.debug("ignoring {} (duplicate)", c)
@@ -305,14 +301,12 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       if (sender != self) sender ! TransportHandler.ReadAck(n)
       log.debug("received node announcement for nodeId={} from {}", n.nodeId, sender)
       nodeAnnouncementMeter.mark()
-      nodeAnnouncementCounter += 1
       stay using handle(n, sender, d)
 
     case Event(u: ChannelUpdate, d: Data) =>
       sender ! TransportHandler.ReadAck(u)
       log.debug("received channel update for shortChannelId={} from {}", u.shortChannelId, sender)
       channelUpdateMeter.mark()
-      channelUpdateCounter += 1
       stay using handle(u, sender, d)
 
     case Event(WatchEventSpentBasic(BITCOIN_FUNDING_EXTERNAL_CHANNEL_SPENT(shortChannelId)), d) if d.channels.contains(shortChannelId) =>
