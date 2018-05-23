@@ -31,6 +31,7 @@ import fr.acinq.eclair.io.Peer
 import fr.acinq.eclair.payment.PaymentRequest.ExtraHop
 import fr.acinq.eclair.transactions.Scripts
 import fr.acinq.eclair.wire._
+import nl.grons.metrics4.scala.{ActorInstrumentedLifeCycle, DefaultInstrumented}
 import org.jgrapht.WeightedGraph
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath
 import org.jgrapht.ext._
@@ -81,11 +82,20 @@ case object TickPruneStaleChannels
   * Created by PM on 24/05/2016.
   */
 
-class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data] {
+class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data] with DefaultInstrumented with ActorInstrumentedLifeCycle {
 
   import Router._
 
   import ExecutionContext.Implicits.global
+
+  val nodeAnnouncementMeter = metrics.meter("NodeAnnouncementMeter")
+  val channelAnnouncementMeter = metrics.meter("ChannelAnnouncementMeter")
+  val channelUpdateMeter = metrics.meter("ChannelUpdateMeter")
+  val nodeAnnouncementCounter = metrics.counter("NodeAnnouncementCounter")
+  val channelAnnouncementCounter = metrics.counter("ChannelAnnouncementCounter")
+  val channelUpdateCounter = metrics.counter("ChannelUpdateCounter")
+
+  val routeRequestTimer = metrics.timer("RouterRequestTimer")
 
   context.system.eventStream.subscribe(self, classOf[LocalChannelUpdate])
   context.system.eventStream.subscribe(self, classOf[LocalChannelDown])
@@ -190,6 +200,8 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
 
     case Event(c: ChannelAnnouncement, d) =>
       log.debug("received channel announcement for shortChannelId={} nodeId1={} nodeId2={} from {}", c.shortChannelId, c.nodeId1, c.nodeId2, sender)
+      channelUpdateMeter.mark()
+      channelUpdateCounter += 1
       if (d.channels.contains(c.shortChannelId)) {
         sender ! TransportHandler.ReadAck(c)
         log.debug("ignoring {} (duplicate)", c)
@@ -292,11 +304,15 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
     case Event(n: NodeAnnouncement, d: Data) =>
       if (sender != self) sender ! TransportHandler.ReadAck(n)
       log.debug("received node announcement for nodeId={} from {}", n.nodeId, sender)
+      nodeAnnouncementMeter.mark()
+      nodeAnnouncementCounter += 1
       stay using handle(n, sender, d)
 
     case Event(u: ChannelUpdate, d: Data) =>
       sender ! TransportHandler.ReadAck(u)
       log.debug("received channel update for shortChannelId={} from {}", u.shortChannelId, sender)
+      channelUpdateMeter.mark()
+      channelUpdateCounter += 1
       stay using handle(u, sender, d)
 
     case Event(WatchEventSpentBasic(BITCOIN_FUNDING_EXTERNAL_CHANNEL_SPENT(shortChannelId)), d) if d.channels.contains(shortChannelId) =>
@@ -411,7 +427,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       graph2dot(d.nodes, d.channels) pipeTo sender
       stay
 
-    case Event(RouteRequest(start, end, assistedRoutes, ignoreNodes, ignoreChannels), d) =>
+    case Event(RouteRequest(start, end, assistedRoutes, ignoreNodes, ignoreChannels), d) => routeRequestTimer.time {
       // we convert extra routing info provided in the payment request to fake channel_update
       // it takes precedence over all other channel_updates we know
       val assistedUpdates = assistedRoutes.flatMap(toFakeUpdates(_, end)).toMap
@@ -423,6 +439,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
         .map(r => sender ! RouteResponse(r, ignoreNodes, ignoreChannels))
         .recover { case t => sender ! Status.Failure(t) }
       stay
+    }
   }
 
   initialize()
