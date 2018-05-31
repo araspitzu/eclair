@@ -93,8 +93,6 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
   val channelUpdateMeter = metrics.meter("ChannelUpdateMeter")
   val knownNodesCounter = metrics.counter("KnownNodesCounter")
 
-  val routeRequestTimer = metrics.timer("RouterRequestTimer")
-
   context.system.eventStream.subscribe(self, classOf[LocalChannelUpdate])
   context.system.eventStream.subscribe(self, classOf[LocalChannelDown])
 
@@ -424,7 +422,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       graph2dot(d.nodes, d.channels) pipeTo sender
       stay
 
-    case Event(RouteRequest(start, end, assistedRoutes, ignoreNodes, ignoreChannels), d) => routeRequestTimer.time {
+    case Event(RouteRequest(start, end, assistedRoutes, ignoreNodes, ignoreChannels), d) =>
       // we convert extra routing info provided in the payment request to fake channel_update
       // it takes precedence over all other channel_updates we know
       val assistedUpdates = assistedRoutes.flatMap(toFakeUpdates(_, end)).toMap
@@ -436,7 +434,6 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
         .map(r => sender ! RouteResponse(r, ignoreNodes, ignoreChannels))
         .recover { case t => sender ! Status.Failure(t) }
       stay
-    }
   }
 
   initialize()
