@@ -92,6 +92,8 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
   val channelAnnouncementMeter = metrics.meter("ChannelAnnouncementMeter")
   val channelUpdateMeter = metrics.meter("ChannelUpdateMeter")
   val knownNodesCounter = metrics.counter("KnownNodesCounter")
+  val knownPublicChannelsCounter = metrics.counter("KnownPublicChannelsCounter")
+  val knownPrivateChannelsCounter = metrics.counter("KnownPrivateChannelsCounter")
 
   context.system.eventStream.subscribe(self, classOf[LocalChannelUpdate])
   context.system.eventStream.subscribe(self, classOf[LocalChannelDown])
@@ -164,6 +166,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
               // channel isn't announced and we never heard of it (maybe it is a private channel or maybe it is a public channel that doesn't yet have 6 confirmations)
               // let's create a corresponding private channel and process the channel_update
               log.info("adding unannounced local channel to remote={} shortChannelId={}", remoteNodeId, shortChannelId)
+              knownPrivateChannelsCounter += 1
               stay using handle(u, self, d.copy(privateChannels = d.privateChannels + (shortChannelId -> remoteNodeId)))
           }
       }
@@ -177,6 +180,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       } else if (d.privateChannels.contains(shortChannelId)) {
         // the channel was private or public-but-not-yet-announced, let's do the clean up
         log.debug("removing private local channel and channel_update for channelId={} shortChannelId={}", channelId, shortChannelId)
+        knownPrivateChannelsCounter -= 1
         val desc1 = ChannelDesc(shortChannelId, nodeParams.nodeId, remoteNodeId)
         val desc2 = ChannelDesc(shortChannelId, remoteNodeId, nodeParams.nodeId)
         // we remove the corresponding updates from the graph
@@ -247,7 +251,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
             val capacity = tx.txOut(outputIndex).amount
             context.system.eventStream.publish(ChannelDiscovered(c, capacity))
             db.addChannel(c, tx.txid, capacity)
-
+            knownPublicChannelsCounter += 1
             // in case we just validated our first local channel, we announce the local node
             if (!d0.nodes.contains(nodeParams.nodeId) && isRelatedTo(c, nodeParams.nodeId)) {
               log.info("first local channel validated, announcing local node")
@@ -261,6 +265,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
           log.warning("ignoring shortChannelId={} tx={} (funding tx not found in utxo)", c.shortChannelId, tx.txid)
           // there may be a record if we have just restarted
           db.removeChannel(c.shortChannelId)
+          knownPublicChannelsCounter -= 1
           false
         case ValidateResult(c, None, _, None) =>
           // TODO: blacklist?
@@ -317,6 +322,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       // let's clean the db and send the events
       log.info("pruning shortChannelId={} (spent)", shortChannelId)
       db.removeChannel(shortChannelId) // NB: this also removes channel updates
+      knownPublicChannelsCounter -= 1
       // we also need to remove updates from the graph
       removeEdge(d.graph, ChannelDesc(lostChannel.shortChannelId, lostChannel.nodeId1, lostChannel.nodeId2))
       removeEdge(d.graph, ChannelDesc(lostChannel.shortChannelId, lostChannel.nodeId2, lostChannel.nodeId1))
@@ -376,6 +382,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       staleChannels.foreach { shortChannelId =>
         log.info("pruning shortChannelId={} (stale)", shortChannelId)
         db.removeChannel(shortChannelId) // NB: this also removes channel updates
+        knownPublicChannelsCounter -= 1
         context.system.eventStream.publish(ChannelLost(shortChannelId))
       }
       // we also need to remove updates from the graph
