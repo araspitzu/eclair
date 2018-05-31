@@ -91,6 +91,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
   val nodeAnnouncementMeter = metrics.meter("NodeAnnouncementMeter")
   val channelAnnouncementMeter = metrics.meter("ChannelAnnouncementMeter")
   val channelUpdateMeter = metrics.meter("ChannelUpdateMeter")
+  val knownNodesCounter = metrics.counter("KnownNodesCounter")
 
   val routeRequestTimer = metrics.timer("RouterRequestTimer")
 
@@ -197,7 +198,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
 
     case Event(c: ChannelAnnouncement, d) =>
       log.debug("received channel announcement for shortChannelId={} nodeId1={} nodeId2={} from {}", c.shortChannelId, c.nodeId1, c.nodeId2, sender)
-      channelUpdateMeter.mark()
+      channelAnnouncementMeter.mark()
       if (d.channels.contains(c.shortChannelId)) {
         sender ! TransportHandler.ReadAck(c)
         log.debug("ignoring {} (duplicate)", c)
@@ -326,6 +327,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
         case nodeId =>
           log.info("pruning nodeId={} (spent)", nodeId)
           db.removeNode(nodeId)
+          knownNodesCounter -= 1
           context.system.eventStream.publish(NodeLost(nodeId))
       }
       stay using d.copy(nodes = d.nodes -- lostNodes, channels = d.channels - shortChannelId, updates = d.updates.filterKeys(_.shortChannelId != shortChannelId))
@@ -387,6 +389,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
         case nodeId =>
           log.info("pruning nodeId={} (stale)", nodeId)
           db.removeNode(nodeId)
+          knownNodesCounter -= 1
           context.system.eventStream.publish(NodeLost(nodeId))
       }
       stay using d.copy(nodes = d.nodes -- staleNodes, channels = channels1, updates = d.updates -- staleUpdates)
@@ -462,6 +465,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
     } else if (d.channels.values.exists(c => isRelatedTo(c, n.nodeId))) {
       log.debug("added node nodeId={}", n.nodeId)
       context.system.eventStream.publish(NodeDiscovered(n))
+      knownNodesCounter += 1
       db.addNode(n)
       d.copy(nodes = d.nodes + (n.nodeId -> n), rebroadcast = d.rebroadcast.copy(nodes = d.rebroadcast.nodes + (n -> Set(origin))))
     } else if (d.awaiting.keys.exists(c => isRelatedTo(c, n.nodeId))) {
@@ -470,6 +474,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
     } else {
       log.debug("ignoring {} (no related channel found)", n)
       // there may be a record if we have just restarted
+      knownNodesCounter -= 1
       db.removeNode(n.nodeId)
       d
     }
