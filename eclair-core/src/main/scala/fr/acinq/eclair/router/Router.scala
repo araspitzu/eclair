@@ -31,6 +31,7 @@ import fr.acinq.eclair.io.Peer
 import fr.acinq.eclair.payment.PaymentRequest.ExtraHop
 import fr.acinq.eclair.transactions.Scripts
 import fr.acinq.eclair.wire._
+import nl.grons.metrics4.scala.{ActorInstrumentedLifeCycle, DefaultInstrumented}
 import org.jgrapht.WeightedGraph
 import org.jgrapht.alg.shortestpath.DijkstraShortestPath
 import org.jgrapht.ext._
@@ -81,11 +82,18 @@ case object TickPruneStaleChannels
   * Created by PM on 24/05/2016.
   */
 
-class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data] {
+class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data] with DefaultInstrumented with ActorInstrumentedLifeCycle {
 
   import Router._
 
   import ExecutionContext.Implicits.global
+
+  val nodeAnnouncementMeter = metrics.meter("NodeAnnouncementMeter")
+  val channelAnnouncementMeter = metrics.meter("ChannelAnnouncementMeter")
+  val channelUpdateMeter = metrics.meter("ChannelUpdateMeter")
+  val knownNodesCounter = metrics.counter("KnownNodesCounter")
+  val knownPublicChannelsCounter = metrics.counter("KnownPublicChannelsCounter")
+  val knownPrivateChannelsCounter = metrics.counter("KnownPrivateChannelsCounter")
 
   context.system.eventStream.subscribe(self, classOf[LocalChannelUpdate])
   context.system.eventStream.subscribe(self, classOf[LocalChannelDown])
@@ -158,6 +166,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
               // channel isn't announced and we never heard of it (maybe it is a private channel or maybe it is a public channel that doesn't yet have 6 confirmations)
               // let's create a corresponding private channel and process the channel_update
               log.info("adding unannounced local channel to remote={} shortChannelId={}", remoteNodeId, shortChannelId)
+              knownPrivateChannelsCounter += 1
               stay using handle(u, self, d.copy(privateChannels = d.privateChannels + (shortChannelId -> remoteNodeId)))
           }
       }
@@ -171,6 +180,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       } else if (d.privateChannels.contains(shortChannelId)) {
         // the channel was private or public-but-not-yet-announced, let's do the clean up
         log.debug("removing private local channel and channel_update for channelId={} shortChannelId={}", channelId, shortChannelId)
+        knownPrivateChannelsCounter -= 1
         val desc1 = ChannelDesc(shortChannelId, nodeParams.nodeId, remoteNodeId)
         val desc2 = ChannelDesc(shortChannelId, remoteNodeId, nodeParams.nodeId)
         // we remove the corresponding updates from the graph
@@ -190,6 +200,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
 
     case Event(c: ChannelAnnouncement, d) =>
       log.debug("received channel announcement for shortChannelId={} nodeId1={} nodeId2={} from {}", c.shortChannelId, c.nodeId1, c.nodeId2, sender)
+      channelAnnouncementMeter.mark()
       if (d.channels.contains(c.shortChannelId)) {
         sender ! TransportHandler.ReadAck(c)
         log.debug("ignoring {} (duplicate)", c)
@@ -240,7 +251,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
             val capacity = tx.txOut(outputIndex).amount
             context.system.eventStream.publish(ChannelDiscovered(c, capacity))
             db.addChannel(c, tx.txid, capacity)
-
+            knownPublicChannelsCounter += 1
             // in case we just validated our first local channel, we announce the local node
             if (!d0.nodes.contains(nodeParams.nodeId) && isRelatedTo(c, nodeParams.nodeId)) {
               log.info("first local channel validated, announcing local node")
@@ -254,6 +265,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
           log.warning("ignoring shortChannelId={} tx={} (funding tx not found in utxo)", c.shortChannelId, tx.txid)
           // there may be a record if we have just restarted
           db.removeChannel(c.shortChannelId)
+          knownPublicChannelsCounter -= 1
           false
         case ValidateResult(c, None, _, None) =>
           // TODO: blacklist?
@@ -292,11 +304,13 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
     case Event(n: NodeAnnouncement, d: Data) =>
       if (sender != self) sender ! TransportHandler.ReadAck(n)
       log.debug("received node announcement for nodeId={} from {}", n.nodeId, sender)
+      nodeAnnouncementMeter.mark()
       stay using handle(n, sender, d)
 
     case Event(u: ChannelUpdate, d: Data) =>
       sender ! TransportHandler.ReadAck(u)
       log.debug("received channel update for shortChannelId={} from {}", u.shortChannelId, sender)
+      channelUpdateMeter.mark()
       stay using handle(u, sender, d)
 
     case Event(WatchEventSpentBasic(BITCOIN_FUNDING_EXTERNAL_CHANNEL_SPENT(shortChannelId)), d) if d.channels.contains(shortChannelId) =>
@@ -308,6 +322,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       // let's clean the db and send the events
       log.info("pruning shortChannelId={} (spent)", shortChannelId)
       db.removeChannel(shortChannelId) // NB: this also removes channel updates
+      knownPublicChannelsCounter -= 1
       // we also need to remove updates from the graph
       removeEdge(d.graph, ChannelDesc(lostChannel.shortChannelId, lostChannel.nodeId1, lostChannel.nodeId2))
       removeEdge(d.graph, ChannelDesc(lostChannel.shortChannelId, lostChannel.nodeId2, lostChannel.nodeId1))
@@ -316,6 +331,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
         case nodeId =>
           log.info("pruning nodeId={} (spent)", nodeId)
           db.removeNode(nodeId)
+          knownNodesCounter -= 1
           context.system.eventStream.publish(NodeLost(nodeId))
       }
       stay using d.copy(nodes = d.nodes -- lostNodes, channels = d.channels - shortChannelId, updates = d.updates.filterKeys(_.shortChannelId != shortChannelId))
@@ -366,6 +382,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
       staleChannels.foreach { shortChannelId =>
         log.info("pruning shortChannelId={} (stale)", shortChannelId)
         db.removeChannel(shortChannelId) // NB: this also removes channel updates
+        knownPublicChannelsCounter -= 1
         context.system.eventStream.publish(ChannelLost(shortChannelId))
       }
       // we also need to remove updates from the graph
@@ -377,6 +394,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
         case nodeId =>
           log.info("pruning nodeId={} (stale)", nodeId)
           db.removeNode(nodeId)
+          knownNodesCounter -= 1
           context.system.eventStream.publish(NodeLost(nodeId))
       }
       stay using d.copy(nodes = d.nodes -- staleNodes, channels = channels1, updates = d.updates -- staleUpdates)
@@ -451,6 +469,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
     } else if (d.channels.values.exists(c => isRelatedTo(c, n.nodeId))) {
       log.debug("added node nodeId={}", n.nodeId)
       context.system.eventStream.publish(NodeDiscovered(n))
+      knownNodesCounter += 1
       db.addNode(n)
       d.copy(nodes = d.nodes + (n.nodeId -> n), rebroadcast = d.rebroadcast.copy(nodes = d.rebroadcast.nodes + (n -> Set(origin))))
     } else if (d.awaiting.keys.exists(c => isRelatedTo(c, n.nodeId))) {
@@ -459,6 +478,7 @@ class Router(nodeParams: NodeParams, watcher: ActorRef) extends FSM[State, Data]
     } else {
       log.debug("ignoring {} (no related channel found)", n)
       // there may be a record if we have just restarted
+      knownNodesCounter -= 1
       db.removeNode(n.nodeId)
       d
     }

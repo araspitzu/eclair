@@ -7,7 +7,7 @@ services:
     ports:
       - "127.0.0.1:8086:8086"
     env_file:
-      - 'monitoring_env.influxdb'
+      - monitoring_env.influxdb
     volumes:
       - ${INFLUXDB_DATADIR}:/var/lib/influxdb
 
@@ -30,7 +30,7 @@ services:
     ports:
       - "127.0.0.1:3000:3000"
     env_file:
-      - 'monitoring_env.grafana'
+      - monitoring_env.grafana
     volumes:
       - ${GRAFANA_DATADIR}:/var/lib/grafana
     links:
