@@ -843,10 +843,10 @@ object Router {
     }
     if (!workingGraph.containsVertex(localNodeId)) throw RouteNotFound
     if (!workingGraph.containsVertex(targetNodeId)) throw RouteNotFound
-    val route_opt = Option(DijkstraShortestPath.findPathBetween(workingGraph, localNodeId, targetNodeId))
-    route_opt match {
-      case Some(path) => path.getEdgeList.map(edge => Hop(edge.desc.a, edge.desc.b, edge.u))
-      case None => throw RouteNotFound
+
+    Graph.shortestPath(workingGraph, localNodeId, targetNodeId) match {
+      case Nil  => throw RouteNotFound
+      case path => path
     }
   }
 

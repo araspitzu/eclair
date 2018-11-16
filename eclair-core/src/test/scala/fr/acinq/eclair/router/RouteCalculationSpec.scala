@@ -19,6 +19,7 @@ package fr.acinq.eclair.router
 import fr.acinq.bitcoin.Crypto.{PrivateKey, PublicKey}
 import fr.acinq.bitcoin.{BinaryData, Block, Crypto}
 import fr.acinq.eclair.payment.PaymentRequest.ExtraHop
+import fr.acinq.eclair.router.Graph.PriorityQueue
 import fr.acinq.eclair.wire._
 import fr.acinq.eclair.{ShortChannelId, randomKey}
 import org.jgrapht.graph.DirectedWeightedPseudograph
@@ -35,6 +36,31 @@ class RouteCalculationSpec extends FunSuite {
   import RouteCalculationSpec._
 
   val (a, b, c, d, e) = (randomKey.publicKey, randomKey.publicKey, randomKey.publicKey, randomKey.publicKey, randomKey.publicKey)
+
+  test("priority queue should behave as a smaller-first type-parametric queue") {
+
+    val queue = new PriorityQueue[String](100)
+
+    queue.enqueue("Marcel", 30)
+    queue.enqueue("Louise", 10)
+    queue.enqueue("Cloe", 20)
+    queue.enqueue("Pierre", 15)
+
+    assert(queue.dequeue() == "Louise")
+    assert(queue.dequeue() == "Pierre")
+    assert(queue.dequeue() == "Cloe")
+    assert(queue.dequeue() == "Marcel")
+
+    queue.enqueue("Bernard", 50)
+    queue.enqueue("Claudia", 40)
+    queue.enqueue("Julie", 30)
+
+    queue.enqueueOrUpdate("Claudia", 20)
+
+    assert(queue.dequeue() == "Claudia")
+    assert(!queue.isEmpty())
+
+  }
 
   test("calculate simple route") {
 

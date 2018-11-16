@@ -92,7 +92,7 @@ eclair.node-color=49daaa
 
 Here are some of the most common options:
 
-name                         | description                                                                           | default value
+name                         | description                                                                           | default data
 -----------------------------|---------------------------------------------------------------------------------------|--------------
  eclair.chain                | Which blockchain to use: *regtest*, *testnet* or *mainnet*                            | testnet
  eclair.server.port          | Lightning TCP port                                                                    | 9735
@@ -105,7 +105,7 @@ name                         | description                                      
  eclair.bitcoind.zmqtx       | Bitcoin Core ZMQ tx address                                                           | "tcp://127.0.0.1:29000"
  eclair.gui.unit             | Unit in which amounts are displayed (possible values: msat, sat, mbtc, btc)           | btc 
 
-Quotes are not required unless the value contains special characters. Full syntax guide [here](https://github.com/lightbend/config/blob/master/HOCON.md).
+Quotes are not required unless the data contains special characters. Full syntax guide [here](https://github.com/lightbend/config/blob/master/HOCON.md).
 
 &rarr; see [`reference.conf`](eclair-core/src/main/resources/reference.conf) for full reference. There are many more options!
 
@@ -115,7 +115,7 @@ Some advanced parameters can be changed with java environment variables. Most us
 
 :warning: Using separate `datadir` is mandatory if you want to run **several instances of eclair** on the same machine. You will also have to change ports in `eclair.conf` (see above).
 
-name                  | description                                | default value
+name                  | description                                | default data
 ----------------------|--------------------------------------------|--------------
 eclair.datadir        | Path to the data directory                 | ~/.eclair
 eclair.headless       | Run eclair without a GUI                   | 
