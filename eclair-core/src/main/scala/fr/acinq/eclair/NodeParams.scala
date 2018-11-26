@@ -75,7 +75,9 @@ case class NodeParams(keyManager: KeyManager,
                       paymentRequestExpiry: FiniteDuration,
                       maxPendingPaymentRequests: Int,
                       maxPaymentFee: Double,
-                      minFundingSatoshis: Long) {
+                      minFundingSatoshis: Long,
+                      wumboEnabled: Boolean
+                     ) {
   val privateKey = keyManager.nodeKey.privateKey
   val nodeId = keyManager.nodeId
 }
@@ -198,7 +200,8 @@ object NodeParams {
       paymentRequestExpiry = FiniteDuration(config.getDuration("payment-request-expiry").getSeconds, TimeUnit.SECONDS),
       maxPendingPaymentRequests = config.getInt("max-pending-payment-requests"),
       maxPaymentFee = config.getDouble("max-payment-fee"),
-      minFundingSatoshis = config.getLong("min-funding-satoshis")
+      minFundingSatoshis = config.getLong("min-funding-satoshis"),
+      wumboEnabled = config.getBoolean("enable-wumbo")
     )
   }
 }

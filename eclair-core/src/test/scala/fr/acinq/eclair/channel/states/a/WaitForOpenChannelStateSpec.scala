@@ -21,10 +21,9 @@ import fr.acinq.bitcoin.Block
 import fr.acinq.eclair.TestConstants.{Alice, Bob}
 import fr.acinq.eclair.channel._
 import fr.acinq.eclair.channel.states.StateTestsHelperMethods
-import fr.acinq.eclair.wire.{Error, Init, OpenChannel}
+import fr.acinq.eclair.wire.{AcceptChannel, Error, Init, OpenChannel}
 import fr.acinq.eclair.{TestConstants, TestkitBaseClass}
-import org.scalatest.Outcome
-
+import org.scalatest.{Outcome, Tag}
 import scala.concurrent.duration._
 
 /**
@@ -36,7 +35,10 @@ class WaitForOpenChannelStateSpec extends TestkitBaseClass with StateTestsHelper
   case class FixtureParam(bob: TestFSMRef[State, Data, Channel], alice2bob: TestProbe, bob2alice: TestProbe, bob2blockchain: TestProbe)
 
   override def withFixture(test: OneArgTest): Outcome = {
-    val setup = init()
+    val setup = test.tags.toList match {
+      case "wumbo" :: Nil => init(nodeParamsB = Bob.nodeParams.copy(wumboEnabled = true))
+      case _ =>   init()
+    }
     import setup._
     val aliceInit = Init(Alice.channelParams.globalFeatures, Alice.channelParams.localFeatures)
     val bobInit = Init(Bob.channelParams.globalFeatures, Bob.channelParams.localFeatures)
@@ -84,6 +86,15 @@ class WaitForOpenChannelStateSpec extends TestkitBaseClass with StateTestsHelper
     val error = bob2alice.expectMsgType[Error]
     assert(error === Error(open.temporaryChannelId, InvalidFundingAmount(open.temporaryChannelId, highFundingMsat, Bob.nodeParams.minFundingSatoshis, Channel.MAX_FUNDING_SATOSHIS).getMessage.getBytes("UTF-8")))
     awaitCond(bob.stateName == CLOSED)
+  }
+
+  test("recv OpenChannel with wumbo", Tag("wumbo")) { f =>
+    import f._
+    val open = alice2bob.expectMsgType[OpenChannel]
+    val highFundingMsat = 100000000
+    bob ! open.copy(fundingSatoshis = highFundingMsat)
+    bob2alice.expectMsgType[AcceptChannel]
+    awaitCond(bob.stateName == WAIT_FOR_FUNDING_CREATED)
   }
 
   test("recv OpenChannel (invalid max accepted htlcs)") { f =>
