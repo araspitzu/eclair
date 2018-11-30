@@ -36,6 +36,9 @@ object Features {
   val CHANNEL_RANGE_QUERIES_BIT_MANDATORY = 6
   val CHANNEL_RANGE_QUERIES_BIT_OPTIONAL = 7
 
+  //TBD the wumbo bit hasn't been chosen yet!!
+  val CHANNEL_WUMBO_MANDATORY = 8
+  val CHANNEL_WUMBO_OPTIONAL = 9
 
   def hasFeature(features: BitSet, bit: Int): Boolean = features.get(bit)
 
