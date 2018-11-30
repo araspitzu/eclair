@@ -99,7 +99,15 @@ class Peer(nodeParams: NodeParams, remoteNodeId: PublicKey, authenticator: Actor
       val remoteHasInitialRoutingSync = Features.hasFeature(remoteInit.localFeatures, Features.INITIAL_ROUTING_SYNC_BIT_OPTIONAL)
       val remoteHasChannelRangeQueriesOptional = Features.hasFeature(remoteInit.localFeatures, Features.CHANNEL_RANGE_QUERIES_BIT_OPTIONAL)
       val remoteHasChannelRangeQueriesMandatory = Features.hasFeature(remoteInit.localFeatures, Features.CHANNEL_RANGE_QUERIES_BIT_MANDATORY)
-      log.info(s"$remoteNodeId has features: initialRoutingSync=$remoteHasInitialRoutingSync channelRangeQueriesOptional=$remoteHasChannelRangeQueriesOptional channelRangeQueriesMandatory=$remoteHasChannelRangeQueriesMandatory")
+      val remoteHasWumboOptional = Features.hasFeature(remoteInit.localFeatures, Features.CHANNEL_WUMBO_OPTIONAL)
+      val remoteHasWumboMandatory = Features.hasFeature(remoteInit.localFeatures, Features.CHANNEL_WUMBO_MANDATORY)
+      log.info(s"$remoteNodeId has features: " +
+        s"initialRoutingSync=$remoteHasInitialRoutingSync " +
+        s"channelRangeQueriesOptional=$remoteHasChannelRangeQueriesOptional " +
+        s"channelRangeQueriesMandatory=$remoteHasChannelRangeQueriesMandatory" +
+        s"channelWumboOptional=$remoteHasWumboOptional" +
+        s"channelWumboMandatory=$remoteHasWumboMandatory")
+
       if (Features.areSupported(remoteInit.localFeatures)) {
         d.origin_opt.foreach(origin => origin ! "connected")
 

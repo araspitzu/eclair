@@ -75,10 +75,10 @@ object Announcements {
     )
   }
 
-  def makeNodeAnnouncement(nodeSecret: PrivateKey, alias: String, color: Color, addresses: List[InetSocketAddress], timestamp: Long = Platform.currentTime / 1000): NodeAnnouncement = {
+  def makeNodeAnnouncement(nodeSecret: PrivateKey, alias: String, color: Color, addresses: List[InetSocketAddress], timestamp: Long = Platform.currentTime / 1000, features: BinaryData): NodeAnnouncement = {
     require(alias.size <= 32)
     val nodeAddresses = addresses.map(NodeAddress(_))
-    val witness = nodeAnnouncementWitnessEncode(timestamp, nodeSecret.publicKey, color, alias, "", nodeAddresses)
+    val witness = nodeAnnouncementWitnessEncode(timestamp, nodeSecret.publicKey, color, alias, features, nodeAddresses)
     val sig = Crypto.encodeSignature(Crypto.sign(witness, nodeSecret)) :+ 1.toByte
     NodeAnnouncement(
       signature = sig,
@@ -86,7 +86,7 @@ object Announcements {
       nodeId = nodeSecret.publicKey,
       rgbColor = color,
       alias = alias,
-      features = "",
+      features = features,
       addresses = nodeAddresses
     )
   }
