@@ -110,7 +110,7 @@ class Setup(datadir: File,
         }
       } yield (progress, chainHash, bitcoinVersion, unspentAddresses, blocks, headers)
       // blocking sanity checks
-      val (progress, chainHash, bitcoinVersion, unspentAddresses, blocks, headers) = await(future, 30 seconds, "bicoind did not respond after 30 seconds")
+      val (progress, chainHash, bitcoinVersion, unspentAddresses, blocks, headers) = await(future, 30 seconds, "bitcoind did not respond after 30 seconds")
       assert(bitcoinVersion >= 160300, "Eclair requires Bitcoin Core 0.16.3 or higher")
       assert(chainHash == nodeParams.chainHash, s"chainHash mismatch (conf=${nodeParams.chainHash} != bitcoind=$chainHash)")
       if (chainHash != Block.RegtestGenesisBlock.hash) {
@@ -118,7 +118,6 @@ class Setup(datadir: File,
       }
       assert(progress > 0.999, s"bitcoind should be synchronized (progress=$progress")
       assert(headers - blocks <= 1, s"bitcoind should be synchronized (headers=$headers blocks=$blocks")
-      // TODO: add a check on bitcoin version?
 
       Bitcoind(bitcoinClient)
     case ELECTRUM =>
