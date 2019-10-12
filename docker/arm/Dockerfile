@@ -1,4 +1,4 @@
-FROM adoptopenjdk/openjdk11:armhf-ubuntu-jdk-11.0.4_11-slim as BUILD
+FROM arm64v8/openjdk:11-jdk-slim as BUILD
 
 # Setup maven, we don't use https://hub.docker.com/_/maven/ as it declare .m2 as volume, we loose all mvn cache
 # We can alternatively do as proposed by https://github.com/carlossg/docker-maven#packaging-a-local-repository-with-the-image
@@ -41,7 +41,7 @@ RUN mvn package -pl eclair-node -am -DskipTests -Dgit.commit.id=notag -Dgit.comm
 # It might be good idea to run the tests here, so that the docker build fail if the code is bugged
 
 # We currently use a debian image for runtime because of some jni-related issue with sqlite
-FROM adoptopenjdk/openjdk11:armhf-ubuntu-jdk-11.0.4_11-slim
+FROM arm64v8/openjdk:11-jre-slim
 WORKDIR /app
 
 # install jq for eclair-cli
