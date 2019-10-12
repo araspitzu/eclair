@@ -3,7 +3,7 @@ FROM adoptopenjdk/openjdk11:armv7l-debian-jdk-11.0.4_11-slim as BUILD
 # Setup maven, we don't use https://hub.docker.com/_/maven/ as it declare .m2 as volume, we loose all mvn cache
 # We can alternatively do as proposed by https://github.com/carlossg/docker-maven#packaging-a-local-repository-with-the-image
 # this was meant to make the image smaller, but we use multi-stage build so we don't care
-RUN apk add --no-cache curl tar bash
+RUN apt-get install curl tar bash
 
 ARG MAVEN_VERSION=3.6.2
 ARG USER_HOME_DIR="/root"
