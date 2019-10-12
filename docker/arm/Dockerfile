@@ -1,4 +1,4 @@
-FROM adoptopenjdk/openjdk11:armv7l-debian-jdk-11.0.4_11-slim as BUILD
+FROM adoptopenjdk/openjdk11:armv7l-ubuntu-jdk-11.0.4_11-slim as BUILD
 
 # Setup maven, we don't use https://hub.docker.com/_/maven/ as it declare .m2 as volume, we loose all mvn cache
 # We can alternatively do as proposed by https://github.com/carlossg/docker-maven#packaging-a-local-repository-with-the-image
@@ -20,20 +20,7 @@ RUN mkdir -p /usr/share/maven /usr/share/maven/ref \
 ENV MAVEN_HOME /usr/share/maven
 ENV MAVEN_CONFIG "$USER_HOME_DIR/.m2"
 
-# Let's fetch eclair dependencies, so that Docker can cache them
-# This way we won't have to fetch dependencies again if only the source code changes
-# The easiest way to reliably get dependencies is to build the project with no sources
 WORKDIR /usr/src
-COPY pom.xml pom.xml
-COPY eclair-core/pom.xml eclair-core/pom.xml
-COPY eclair-node/pom.xml eclair-node/pom.xml
-COPY eclair-node-gui/pom.xml eclair-node-gui/pom.xml
-RUN mkdir -p eclair-core/src/main/scala && touch eclair-core/src/main/scala/empty.scala
-# Blank build. We only care about eclair-node, and we use install because eclair-node depends on eclair-core
-RUN mvn install -pl eclair-node -am
-RUN mvn clean
-
-# Only then do we copy the sources
 COPY . .
 
 # And this time we can build in offline mode, specifying 'notag' instead of git commit
