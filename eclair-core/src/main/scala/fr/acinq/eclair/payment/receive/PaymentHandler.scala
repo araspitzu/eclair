@@ -20,9 +20,27 @@ import akka.actor.Actor.Receive
 import akka.actor.{Actor, ActorContext, ActorRef, DiagnosticActorLogging, Props}
 import akka.event.DiagnosticLoggingAdapter
 import akka.event.Logging.MDC
+import fr.acinq.bitcoin.ByteVector32
 import fr.acinq.eclair.{Logs, NodeParams}
 
+import scala.collection.mutable
+
 trait ReceiveHandler {
+  // contains the payments in pending status for this handler [paymentHash, (preimage, handlerActor)]
+  private val pendingPayments: mutable.Map[ByteVector32, (ByteVector32, ActorRef)] = mutable.Map.empty
+
+  def addPendingPayment(paymentHash: ByteVector32, preimage: ByteVector32, handler: ActorRef): Unit = {
+    pendingPayments += (paymentHash -> (preimage, handler))
+  }
+
+  def getPendingPayment(paymentHash: ByteVector32): Option[(ByteVector32, ActorRef)] = pendingPayments.get(paymentHash)
+
+  def getPendingPayments(): Set[ByteVector32] = pendingPayments.keySet.toSet
+
+  def removePendingPayment(paymentHash: ByteVector32): Unit = {
+    pendingPayments -= paymentHash
+  }
+
   def handle(implicit ctx: ActorContext, log: DiagnosticLoggingAdapter): Receive
 }
 

@@ -39,9 +39,6 @@ class MultiPartHandler(nodeParams: NodeParams, db: IncomingPaymentsDb, commandBu
 
   import MultiPartHandler._
 
-  // NB: this is safe because this handler will be called from within an actor
-  private var pendingPayments: Map[ByteVector32, (ByteVector32, ActorRef)] = Map.empty
-
   /**
    * Can be overridden for a more fine-grained control of whether or not to handle this payment hash.
    * If the call returns false, then the pattern matching will fail and the payload will be passed to other handlers.
@@ -85,13 +82,13 @@ class MultiPartHandler(nodeParams: NodeParams, db: IncomingPaymentsDb, commandBu
               commandBuffer ! CommandBuffer.CommandSend(p.add.channelId, cmdFail)
             case None =>
               log.info(s"received payment for amount=${p.add.amountMsat} totalAmount=${p.payload.totalAmount}")
-              pendingPayments.get(p.add.paymentHash) match {
+              getPendingPayment(p.add.paymentHash) match {
                 case Some((_, handler)) =>
                   handler ! MultiPartPaymentFSM.MultiPartHtlc(p.payload.totalAmount, p.add)
                 case None =>
                   val handler = ctx.actorOf(MultiPartPaymentFSM.props(nodeParams, p.add.paymentHash, p.payload.totalAmount, ctx.self))
                   handler ! MultiPartPaymentFSM.MultiPartHtlc(p.payload.totalAmount, p.add)
-                  pendingPayments = pendingPayments + (p.add.paymentHash -> (record.paymentPreimage, handler))
+                  addPendingPayment(p.add.paymentHash, record.paymentPreimage, handler)
               }
           }
           case None =>
@@ -103,9 +100,9 @@ class MultiPartHandler(nodeParams: NodeParams, db: IncomingPaymentsDb, commandBu
     case MultiPartPaymentFSM.MultiPartHtlcFailed(paymentHash, failure, parts) if doHandle(paymentHash) =>
       Logs.withMdc(log)(Logs.mdc(paymentHash_opt = Some(paymentHash))) {
         log.warning(s"payment with paidAmount=${parts.map(_.payment.amount).sum} failed ($failure)")
-        pendingPayments.get(paymentHash).foreach { case (_, handler: ActorRef) => handler ! PoisonPill }
+        getPendingPayment(paymentHash).foreach { case (_, handler: ActorRef) => handler ! PoisonPill }
         parts.foreach(p => commandBuffer ! CommandBuffer.CommandSend(p.payment.fromChannelId, CMD_FAIL_HTLC(p.htlcId, Right(failure), commit = true)))
-        pendingPayments = pendingPayments - paymentHash
+        removePendingPayment(paymentHash)
       }
 
     case MultiPartPaymentFSM.MultiPartHtlcSucceeded(paymentHash, parts) if doHandle(paymentHash) =>
@@ -114,13 +111,13 @@ class MultiPartHandler(nodeParams: NodeParams, db: IncomingPaymentsDb, commandBu
         log.info(s"received complete payment for amount=${received.amount}")
         // The first thing we do is store the payment. This allows us to reconcile pending HTLCs after a restart.
         db.receiveIncomingPayment(paymentHash, received.amount, received.timestamp)
-        pendingPayments.get(paymentHash).foreach {
+        getPendingPayment(paymentHash).foreach {
           case (preimage: ByteVector32, handler: ActorRef) =>
             handler ! PoisonPill
             parts.foreach(p => commandBuffer ! CommandBuffer.CommandSend(p.payment.fromChannelId, CMD_FULFILL_HTLC(p.htlcId, preimage, commit = true)))
         }
         ctx.system.eventStream.publish(received)
-        pendingPayments = pendingPayments - paymentHash
+        removePendingPayment(paymentHash)
         onSuccess(received)
       }
 
@@ -138,7 +135,7 @@ class MultiPartHandler(nodeParams: NodeParams, db: IncomingPaymentsDb, commandBu
         }
       }
 
-    case GetPendingPayments => ctx.sender ! PendingPayments(pendingPayments.keySet)
+    case GetPendingPayments => ctx.sender ! PendingPayments(getPendingPayments())
 
     case ack: CommandBuffer.CommandAck => commandBuffer forward ack
 
