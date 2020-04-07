@@ -103,8 +103,10 @@ object TlvCodecs {
   /** Length-prefixed truncated uint16 (1 to 3 bytes unsigned integer). */
   val ltu16: Codec[Int] = variableSizeBytes(uint8, tu16)
 
+  private val TLV_CUSTOM_RECORD_TYPE_BOUND = 65536
+
   private def validateGenericTlv(g: GenericTlv): Attempt[GenericTlv] = {
-    if (g.tag.toBigInt % 2 == 0) {
+    if (g.tag.toBigInt < TLV_CUSTOM_RECORD_TYPE_BOUND && g.tag.toBigInt % 2 == 0) {
       Attempt.Failure(Err("unknown even tlv type"))
     } else {
       Attempt.Successful(g)
